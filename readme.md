@@ -25,5 +25,3 @@ Our objective is to develop and refine models that can interpret complex pattern
 - Enhancing navigation systems in complex indoor environments such as airports, malls, and hospitals.
 - Enabling location-based services and advertisements.
 - Improving safety and security monitoring by providing precise location tracking within indoor spaces.
-
-We invite collaborators, researchers, and developers to join us in advancing the state of indoor positioning technologies by contributing to DeepLocateCSI. Together, we can unlock new possibilities for indoor navigation and beyond.

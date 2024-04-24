@@ -25,7 +25,7 @@ from CSIKit.tools.batch_graph import BatchGraph
 from CSIKit.util import csitools
 
 import numpy as np
-
+dat_path = os.getcwd()+'/dataset/(5,0).dat'
 my_reader = get_reader(dat_path)
 csi_data = my_reader.read_file(dat_path, scaled=True)
 csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(csi_data, metric="amplitude")
@@ -43,8 +43,9 @@ csi_matrix_squeezed = np.squeeze(csi_matrix_first)
 #  - a running mean filter for smoothing (window size = 10)
 
 for x in range(no_frames):
-  csi_matrix_squeezed[x] = lowpass(csi_matrix_squeezed[x], 10, 400, 5)
-  csi_matrix_squeezed[x] = hampel(csi_matrix_squeezed[x], 10, 3)
-  csi_matrix_squeezed[x] = running_mean(csi_matrix_squeezed[x], 10)
+  csi_matrix_squeezed[x] = lowpass(csi_matrix_squeezed[x], 50, 400, 5)
+  csi_matrix_squeezed[x] = hampel(csi_matrix_squeezed[x], 50, 3)
+  csi_matrix_squeezed[x] = running_mean(csi_matrix_squeezed[x], 50)
 
 BatchGraph.plot_heatmap(csi_matrix_squeezed, csi_data.timestamps)
+

@@ -19,6 +19,10 @@ for dat_file in dat_files:
     if match:
         x_label, y_label = match.groups()
         filename = f"{x_label}_{y_label}.csv"  # 创建以坐标命名的文件名
+        csv_path = os.path.join(dat_directory, filename)
+        # 如果文件已经存在，则跳过
+        if os.path.exists(csv_path):
+            continue
 
         # 读取CSI数据
         my_reader = get_reader(dat_file)
@@ -46,5 +50,4 @@ for dat_file in dat_files:
         combined_df['timestamp'] = timestamps
 
         # 保存为CSV文件
-        csv_path = os.path.join(dat_directory, filename)
         combined_df.to_csv(csv_path, index=False)

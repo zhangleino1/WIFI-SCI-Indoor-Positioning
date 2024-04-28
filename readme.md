@@ -32,3 +32,8 @@ conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
 
+# csv文件格式说明
+antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
+
+#  wifi sci 热力图
+![0_0_ant0_amplitude_filtered](/)

@@ -12,7 +12,7 @@ import os
 def main(args):
     # 设置数据模块
     data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,
-                                time_step=args.time_step, data_dir=args.data_dir)
+                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stripe)
 
     # 设置模型
     model = CSINet(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
@@ -66,10 +66,11 @@ if __name__ == '__main__':
     parser.add_argument("--lr_patience", type=int, default=10, help="Number of epochs with no improvement after which learning rate will be reduced")
     parser.add_argument("--lr_eps", type=float, default=1e-6, help="Epsilon for learning rate reduction")
     parser.add_argument("--time_step", type=int, default=30, help="Time steps to use for each sample")
-    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset", help="Directory for output")
+    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset_test", help="Directory for output")
     parser.add_argument('--min_epochs', default=100, type=int)
     parser.add_argument('--max_epochs', default=120, type=int)
     parser.add_argument('--min_steps', type=int, default=5)
-    parser.add_argument('--fast_dev_run', default=False, type=bool)
+    parser.add_argument('--fast_dev_run', default=True, type=bool)
+    parser.add_argument('--stripe', type=int, default=1)
     args = parser.parse_args()
     main(args)

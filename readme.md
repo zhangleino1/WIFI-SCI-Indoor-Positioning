@@ -35,6 +35,10 @@ pip install -U 'tensorboard'
 # 数据集
 csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
+[csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
+
+[dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
+
 # 文件说明
 本项目基于 pytorch lightning 
 ```
@@ -44,4 +48,5 @@ util.py  规范化，中值滤波
 heatmappic.py 热力图生成
 csi_dataset.py 数据集
 csi_net_model.py cnn 模型
+csi.pdf 复现的论文
 ```

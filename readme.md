@@ -32,8 +32,8 @@ conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
 ```
-# csv文件格式说明
-antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
+# 数据集
+csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
 # 文件说明
 本项目基于 pytorch lightning 

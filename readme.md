@@ -25,3 +25,10 @@ Our objective is to develop and refine models that can interpret complex pattern
 - Enhancing navigation systems in complex indoor environments such as airports, malls, and hospitals.
 - Enabling location-based services and advertisements.
 - Improving safety and security monitoring by providing precise location tracking within indoor spaces.
+
+# 报错 注意安装
+```
+conda install lightning -c conda-forge
+pip install -U 'tensorboardX'
+pip install -U 'tensorboard'
+

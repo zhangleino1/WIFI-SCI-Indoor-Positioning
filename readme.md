@@ -31,9 +31,17 @@ Our objective is to develop and refine models that can interpret complex pattern
 conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
-
+```
 # csv文件格式说明
 antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
-#  wifi sci 热力图
-![0_0_ant0_amplitude_filtered](/)
+# 文件说明
+本项目基于 pytorch lightning 
+```
+main.py  训练，预测入口
+data_process.py  dat文件转成csv 方便快读读取
+util.py  规范化，中值滤波
+heatmappic.py 热力图生成
+csi_dataset.py 数据集
+csi_net_model.py cnn 模型
+```

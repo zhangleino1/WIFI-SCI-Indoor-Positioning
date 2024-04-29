@@ -4,7 +4,7 @@ from torch import nn
 from torch.nn import functional as F
 import matplotlib.pyplot as plt
 import numpy as np
-
+import os
 class CSINet(pl.LightningModule):
     def __init__(self, lr, lr_factor, lr_patience, lr_eps):
         super().__init__()
@@ -77,20 +77,22 @@ class CSINet(pl.LightningModule):
 
      # 每个epoch结束后执行,一个test_data_loader执行一次
     def on_test_epoch_end(self):
-            # 将损失列表转换为NumPy数组，计算CDF
+        # 将损失列表转换为NumPy数组，计算CDF
         losses = np.array(self.test_losses)
-        sorted_losses = np.sort(losses)
-        p = 100. * np.arange(len(sorted_losses)) / (len(sorted_losses) - 1)  # 计算百分比
+        unique_losses, counts = np.unique(losses, return_counts=True)
+        # 计算每个唯一损失值的累积分布百分比
+        cumulative_distribution = np.cumsum(counts) / np.sum(counts) * 100
 
+        # 绘制CDF图，确保不包含平直线
         plt.figure(figsize=(8, 6))
-        plt.plot(sorted_losses, p)
+        plt.step(unique_losses, cumulative_distribution, where='post')  # 使用step绘图，避免线性插值
         plt.xlabel('Test Loss')
         plt.ylabel('CDF (%)')
         plt.title('CDF of Test Losses')
         plt.grid(True)
+        plt.savefig(os.getcwd() + '/test_loss_cdf.png')  # 保存图像
         plt.show()
 
         # 清空测试损失列表，为下一次测试准备
         self.test_losses = []
         print('on_test_epoch_end')
-        pass

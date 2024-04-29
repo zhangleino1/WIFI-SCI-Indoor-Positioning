@@ -28,13 +28,13 @@ from torch.utils.data import Dataset
 from collections import OrderedDict
 
 class CSIDataset(Dataset):
-    def __init__(self, directory, time_step, stride=1, cache_size=350):
+    def __init__(self, directory, time_step, stride=1, cache_size=200):
         self.directory = directory
         self.time_step = time_step
         self.stride = stride
-        self.data_files = {ant: sorted(glob.glob(os.path.join(self.directory, f'antenna_{ant}_*.csv'))) for ant in range(1, 4)}
         self.cache = OrderedDict()
         self.cache_size = cache_size
+        self.data_files = {ant: sorted(glob.glob(os.path.join(self.directory, f'antenna_{ant}_*.csv'))) for ant in range(1, 4)}
         self.index_map = self._prepare_index_map()
         self.total_samples = sum(len(lst) for lst in self.index_map.values())
 
@@ -42,28 +42,35 @@ class CSIDataset(Dataset):
         index_map = {}
         for file_idx, file_path in enumerate(self.data_files[1]):
             df = self._load_csv(file_path)
-            num_segments = (len(df) - self.time_step + 1) // self.stride
+            num_segments = (len(df[0]) - self.time_step + 1) // self.stride
             index_map[file_idx] = list(range(num_segments))
         return index_map
 
     def _load_csv(self, file_path):
         device = 'cuda' if torch.cuda.is_available() else 'cpu'  # 自动检测GPU
-        """ Load a CSV file with caching using an OrderedDict for LRU behavior. """
         key = file_path
         if key in self.cache:
             print(f"Cache hit for {file_path}")
-            # Hit: move to end to show that it was recently used
             self.cache.move_to_end(key)
             return self.cache[key]
         else:
-            # Miss: load the data, add to the cache
-            print(f"Loading {file_path}")
+            print(f"Loading and processing {file_path}")
             df = pd.read_csv(file_path)
-            self.cache[key] = df
-            # If cache is full, remove the oldest item
+            amplitude_data = df.filter(regex='^amplitude_').values.astype(np.float32)
+            phase_data = df.filter(regex='^phase_').values.astype(np.float32)
+            
+            # 应用中值滤波和最小-最大规范化
+            amplitude_data = min_max_normalization(median_filter(amplitude_data))
+            phase_data = min_max_normalization(median_filter(phase_data))
+            
+            # 转换为Tensor并移至GPU
+            amplitude_tensor = torch.tensor(amplitude_data, dtype=torch.float32).to(device)
+            phase_tensor = torch.tensor(phase_data, dtype=torch.float32).to(device)
+            
+            self.cache[key] = (amplitude_tensor, phase_tensor)  # 存储处理后的张量
             if len(self.cache) > self.cache_size:
                 self.cache.popitem(last=False)
-            return df
+            return self.cache[key]
 
     def __len__(self):
         return self.total_samples
@@ -78,21 +85,17 @@ class CSIDataset(Dataset):
 
         all_channels_data = []
         for ant in range(1, 4):
-            df = self._load_csv(self.data_files[ant][file_idx])
-            amplitude_data = df.filter(regex='^amplitude_').values.astype(np.float32)
-            phase_data = df.filter(regex='^phase_').values.astype(np.float32)
-              # 应用中值滤波和最小-最大规范化
-            amplitude_data = min_max_normalization(median_filter(amplitude_data))
-            phase_data = min_max_normalization(median_filter(phase_data))
+            amplitude_tensor, phase_tensor = self._load_csv(self.data_files[ant][file_idx])
             start_idx = segment_idx * self.stride
             end_idx = start_idx + self.time_step
-            all_channels_data.append(amplitude_data[start_idx:end_idx])
-            all_channels_data.append(phase_data[start_idx:end_idx])
+            all_channels_data.append(amplitude_tensor[start_idx:end_idx])
+            all_channels_data.append(phase_tensor[start_idx:end_idx])
         
-        sample_data = np.stack(all_channels_data)
+        sample_data = torch.stack(all_channels_data)
         match = re.search(r'antenna_\d+_(\d+)_(\d+).csv', os.path.basename(self.data_files[1][file_idx]))
         x, y = map(int, match.groups()) if match else (0, 0)
-        return sample_data, np.array([x, y], dtype=np.float32)
+        return sample_data, torch.tensor([x, y], dtype=torch.float32, device=sample_data.device)
+
 
 
 # class CSIDataset(Dataset):

@@ -2,6 +2,8 @@ import torch
 import pytorch_lightning as pl
 from torch import nn
 from torch.nn import functional as F
+import matplotlib.pyplot as plt
+import numpy as np
 
 class CSINet(pl.LightningModule):
     def __init__(self, lr, lr_factor, lr_patience, lr_eps):
@@ -10,6 +12,7 @@ class CSINet(pl.LightningModule):
         self.lr_factor = lr_factor
         self.lr_patience = lr_patience
         self.lr_eps = lr_eps
+        self.test_losses = []  # 初始化空列表以收集测试损失
         
         self.conv1 = nn.Conv2d(in_channels=6, out_channels=18, kernel_size=5, padding=2)
         self.bn1 = nn.BatchNorm2d(num_features=18)
@@ -54,19 +57,40 @@ class CSINet(pl.LightningModule):
         data, targets = batch
         outputs = self(data)
         loss = F.mse_loss(outputs, targets)
-        self.log('train_loss', loss)
+        self.log('train_loss', loss,on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, targets = batch
         outputs = self(data)
         loss = F.mse_loss(outputs, targets)
-        self.log('val_loss', loss)
+        self.log('val_loss', loss,on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def test_step(self, batch, batch_idx):
         data, targets = batch
         outputs = self(data)
         loss = F.mse_loss(outputs, targets)
-        self.log('test_loss', loss)
+        self.log('test_loss', loss,on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.test_losses.append(loss.item())  # 将损失加入列表
         return loss
+
+     # 每个epoch结束后执行,一个test_data_loader执行一次
+    def on_test_epoch_end(self):
+            # 将损失列表转换为NumPy数组，计算CDF
+        losses = np.array(self.test_losses)
+        sorted_losses = np.sort(losses)
+        p = 100. * np.arange(len(sorted_losses)) / (len(sorted_losses) - 1)  # 计算百分比
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(sorted_losses, p)
+        plt.xlabel('Test Loss')
+        plt.ylabel('CDF (%)')
+        plt.title('CDF of Test Losses')
+        plt.grid(True)
+        plt.show()
+
+        # 清空测试损失列表，为下一次测试准备
+        self.test_losses = []
+        print('on_test_epoch_end')
+        pass

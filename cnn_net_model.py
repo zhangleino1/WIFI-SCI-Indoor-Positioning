@@ -26,11 +26,11 @@ class CNN_Net(pl.LightningModule):
         conv_output_size = 18 * 30 * 30  # 18个过滤器，每个过滤器30x30的输出
         
          # 选择合适的神经元数量，这里做了适当调整以适应更多的通道
-        self.fc1 = nn.Linear(conv_output_size, 5000)
-        self.bn4 = nn.BatchNorm1d(num_features=5000)
-        self.fc2 = nn.Linear(5000, 500)
-        self.bn5 = nn.BatchNorm1d(num_features=500)
-        self.fc3 = nn.Linear(500, 2)         # 输出层，预测位置，有2个神经元
+        self.fc1 = nn.Linear(conv_output_size, 9000)
+        self.bn4 = nn.BatchNorm1d(num_features=9000)
+        self.fc2 = nn.Linear(9000, 900)
+        self.bn5 = nn.BatchNorm1d(num_features=900)
+        self.fc3 = nn.Linear(900, 2)         # 输出层，预测位置，有2个神经元
 
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
@@ -87,7 +87,7 @@ class CNN_Net(pl.LightningModule):
         plt.figure(figsize=(8, 6))
         plt.step(unique_losses, cumulative_distribution, where='post')  # 使用step绘图，避免线性插值
         plt.xlabel('Distnce Error (meter)')
-        plt.ylabel('CDF')
+        plt.ylabel('CNN CDF')
         plt.grid(True)
         plt.savefig(os.getcwd() + '/test_loss_cdf.png')  # 保存图像
         plt.show()

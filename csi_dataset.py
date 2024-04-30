@@ -28,7 +28,7 @@ from torch.utils.data import Dataset
 from collections import OrderedDict
 
 class CSIDataset(Dataset):
-    def __init__(self, directory, time_step, stride=1, cache_size=200):
+    def __init__(self, directory, time_step, stride=1, cache_size=270):
         self.directory = directory
         self.time_step = time_step
         self.stride = stride

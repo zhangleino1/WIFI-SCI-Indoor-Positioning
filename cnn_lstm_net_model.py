@@ -89,10 +89,10 @@ class CNN_LSTM_Net(pl.LightningModule):
         # 绘制CDF图，确保不包含平直线
         plt.figure(figsize=(8, 6))
         plt.step(unique_losses, cumulative_distribution, where='post')  # 使用step绘图，避免线性插值
-        plt.xlabel('Distnce Error (meter)')
+        plt.xlabel('Distance Error (meter)')
         plt.ylabel('CNN_LSTM CDF')
         plt.grid(True)
-        plt.savefig(os.getcwd() + '/test_loss_cdf.png')  # 保存图像
+        plt.savefig(os.getcwd() + '/cnn_lstm_cdf.png')  # 保存图像
         plt.show()
 
         # 清空测试损失列表，为下一次测试准备

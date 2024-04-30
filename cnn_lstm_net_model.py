@@ -5,15 +5,15 @@ from torch.nn import functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-class CSINet(pl.LightningModule):
-    def __init__(self, lr, lr_factor, lr_patience, lr_eps):
+class CNN_LSTM_Net(pl.LightningModule):
+    def __init__(self, lr, lr_factor, lr_patience, lr_eps, dropout_rate=0.5):
         super().__init__()
         self.lr = lr
         self.lr_factor = lr_factor
         self.lr_patience = lr_patience
         self.lr_eps = lr_eps
-        self.test_losses = []  # 初始化空列表以收集测试损失
-        
+        self.test_losses = []
+
         self.conv1 = nn.Conv2d(in_channels=6, out_channels=18, kernel_size=5, padding=2)
         self.bn1 = nn.BatchNorm2d(num_features=18)
         self.conv2 = nn.Conv2d(in_channels=18, out_channels=18, kernel_size=5, padding=2)
@@ -21,22 +21,35 @@ class CSINet(pl.LightningModule):
         self.conv3 = nn.Conv2d(in_channels=18, out_channels=18, kernel_size=5, padding=2)
         self.bn3 = nn.BatchNorm2d(num_features=18)
 
-        # 计算卷积层后的输出尺寸，以便为全连接层设置正确的输入维度
-        # 假设卷积层不会改变空间尺寸（由于padding=2），则维度仍然是30x30
-        conv_output_size = 18 * 30 * 30  # 18个过滤器，每个过滤器30x30的输出
-        
-         # 选择合适的神经元数量，这里做了适当调整以适应更多的通道
-        self.fc1 = nn.Linear(conv_output_size, 5000)
+        self.lstm1 = nn.LSTM(input_size=30*30, hidden_size=256, batch_first=True)
+        self.bn_lstm1 = nn.BatchNorm1d(num_features=256)  # 批量归一化层
+        self.dropout1 = nn.Dropout(dropout_rate)  # Dropout层
+
+        self.lstm2 = nn.LSTM(input_size=256, hidden_size=128, batch_first=True)
+        self.bn_lstm2 = nn.BatchNorm1d(num_features=128)  # 另一个批量归一化层
+
+        self.fc1 = nn.Linear(128, 5000)
         self.bn4 = nn.BatchNorm1d(num_features=5000)
         self.fc2 = nn.Linear(5000, 500)
         self.bn5 = nn.BatchNorm1d(num_features=500)
-        self.fc3 = nn.Linear(500, 2)         # 输出层，预测位置，有2个神经元
+        self.fc3 = nn.Linear(500, 2)
 
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.relu(self.bn3(self.conv3(x)))
-        x = x.view(x.size(0), -1)
+        x = x.permute(0, 2, 1, 3).contiguous()
+        x = x.view(x.size(0), x.size(1), -1)
+
+        x, _ = self.lstm1(x)
+        x = self.bn_lstm1(x)
+        x = self.dropout1(x)
+
+        x, _ = self.lstm2(x)
+        x = self.bn_lstm2(x)
+
+        x = x[:, -1, :]
+
         x = F.relu(self.bn4(self.fc1(x)))
         x = F.relu(self.bn5(self.fc2(x)))
         x = self.fc3(x)
@@ -81,14 +94,13 @@ class CSINet(pl.LightningModule):
         losses = np.array(self.test_losses)
         unique_losses, counts = np.unique(losses, return_counts=True)
         # 计算每个唯一损失值的累积分布百分比
-        cumulative_distribution = np.cumsum(counts) / np.sum(counts) * 100
+        cumulative_distribution = np.cumsum(counts) / np.sum(counts)
 
         # 绘制CDF图，确保不包含平直线
         plt.figure(figsize=(8, 6))
         plt.step(unique_losses, cumulative_distribution, where='post')  # 使用step绘图，避免线性插值
-        plt.xlabel('Test Loss')
-        plt.ylabel('CDF (%)')
-        plt.title('CDF of Test Losses')
+        plt.xlabel('Distnce Error (meter)')
+        plt.ylabel('CDF')
         plt.grid(True)
         plt.savefig(os.getcwd() + '/test_loss_cdf.png')  # 保存图像
         plt.show()

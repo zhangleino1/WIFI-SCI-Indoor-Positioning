@@ -4,7 +4,8 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint,EarlyStopping, LearningRateMonitor
 from pytorch_lightning.loggers import TensorBoardLogger
 from csi_dataset import CSIDataModule
-from csi_net_model import CSINet
+from cnn_net_model import CNN_Net
+from cnn_lstm_net_model import CNN_LSTM_Net
 import torch
 import os
 
@@ -62,10 +63,10 @@ def train(args):
 
 def get_model(args):
     if args.model_type == 'cnn':
-        return CSINet(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        return CNN_Net(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
 
     elif args.model_type == 'cnn_lstm':
-        return CSINet(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        return CNN_LSTM_Net(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
     else:
         raise ValueError("Invalid model type specified")
 
@@ -78,9 +79,9 @@ def test(args):
         # 将 Namespace 对象转换为字典
     hparams_dict = vars(args)
     if args.model_type == 'cnn':
-        model = CSINet.load_from_checkpoint(args.cpt_path,lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        model = CNN_Net.load_from_checkpoint(args.cpt_path,lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
     elif args.model_type == 'cnn_lstm':
-        model = CSINet.load_from_checkpoint(args.cpt_path,lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        model = CNN_LSTM_Net.load_from_checkpoint(args.cpt_path,lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
     else:
         raise ValueError("Invalid model type specified")
     data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,

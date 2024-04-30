@@ -47,6 +47,7 @@ data_process.py  dat文件转成csv 方便快读读取
 util.py  规范化，中值滤波
 heatmappic.py 热力图生成
 csi_dataset.py 数据集
-csi_net_model.py cnn 模型
+cnn_net_model.py cnn 模型
+cnn_lstm_net_model.py cnn+lstm模型
 csi.pdf 复现的论文
 ```

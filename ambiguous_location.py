@@ -71,7 +71,7 @@ class CNN_LSTM_Net(nn.Module):
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = CNN_LSTM_Net().to(device)
 # 注意修改路径
-model_path = os.getcwd() + '/logs/cnn_lstm/version_9/checkpoints/last.ckpt'
+model_path = os.getcwd() + '/logs/cnn_lstm/version_2/checkpoints/last.ckpt'
 model.load_state_dict(torch.load(model_path)['state_dict'])
 model.eval()  # 设置为评估模式
 
@@ -103,7 +103,7 @@ class CSIDataHandler:
             if len(files) == 3:
                 all_data = []
                 for file_path in sorted(files):  # 根据文件名排序，以保证天线顺序
-                    df = pd.read_csv(file_path)
+                    df = pd.read_csv(file_path, na_values='#NAME?')
                     amplitude_data = df.filter(regex='^amplitude_').values.astype(np.float32)
                     phase_data = df.filter(regex='^phase_').values.astype(np.float32)
                     

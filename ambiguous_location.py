@@ -4,6 +4,7 @@ import numpy as np
 from torch.utils.data import DataLoader
 from scipy.stats import pearsonr
 import torch
+import torch.nn as nn
 from csi_dataset import CSIDataModule
 import os
 from util import min_max_normalization, median_filter
@@ -17,6 +18,65 @@ import os
 import glob
 import matplotlib.pyplot as plt
 import re
+
+
+import torch.nn as nn
+import torch.nn.functional as F
+import pytorch_lightning as pl
+
+class CNN_LSTM_Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+      
+        self.test_losses = []  # 初始化空列表以收集测试损失
+        
+        # 卷积层
+        self.conv1 = nn.Conv2d(in_channels=6, out_channels=18, kernel_size=5, padding=2)
+        self.bn1 = nn.BatchNorm2d(num_features=18)
+        self.conv2 = nn.Conv2d(in_channels=18, out_channels=18, kernel_size=5, padding=2)
+        self.bn2 = nn.BatchNorm2d(num_features=18)
+        self.conv3 = nn.Conv2d(in_channels=18, out_channels=18, kernel_size=5, padding=2)
+        self.bn3 = nn.BatchNorm2d(num_features=18)
+
+        # LSTM层
+        self.lstm = nn.LSTM(input_size=18*30, hidden_size=100, batch_first=True)
+
+        # 输出层
+        self.fc = nn.Linear(100, 2)
+
+        # 用于存储LSTM特征的属性
+        self.lstm_features = None
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        
+        # 重塑输出以匹配LSTM输入 (batch_size, seq_len, features)
+        x = x.permute(0, 2, 1, 3).contiguous()
+        x = x.view(x.size(0), x.size(1), -1)
+
+        # LSTM处理
+        lstm_out, _ = self.lstm(x)
+        self.lstm_features = lstm_out[:, -1, :]  # 存储最后一个时间步的特征
+        
+        # 经过一个全连接层输出最终的二维坐标
+        x = self.fc(self.lstm_features)
+        return self.lstm_features
+
+
+        
+
+# 加载模型
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+model = CNN_LSTM_Net().to(device)
+# 注意修改路径
+model_path = os.getcwd() + '/logs/cnn_lstm/version_9/checkpoints/last.ckpt'
+model.load_state_dict(torch.load(model_path)['state_dict'])
+model.eval()  # 设置为评估模式
+
+
+
 class CSIDataHandler:
     def __init__(self, data_directory, time_steps=30):
         self.directory = data_directory
@@ -71,7 +131,7 @@ class CSIDataHandler:
         return np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
     
    
-    def calculate_inter_location_correlation(self, data_by_location):
+    def calculate_inter_location_correlation(self, data_by_location, type='raw'):
         correlation_results = {}
         locations = list(data_by_location.keys())  # 获取所有位置的列表
         for i in range(len(locations)):
@@ -79,16 +139,34 @@ class CSIDataHandler:
                 data_i = data_by_location[locations[i]]
                 data_j = data_by_location[locations[j]]
                 coeffs = []
-                # 假设data_i和data_j是同样形状的数组
-                for channel in range(min(data_i.shape[0], data_j.shape[0])):  # 遍历频道
-                    xi = data_i[channel, :, :]  # 选择特定频道的所有时间步和特征
-                    xj = data_j[channel, :, :]
-                    coeff, _ = pearsonr(xi.flatten(), xj.flatten())
+                num_channels = min(data_i.shape[0], data_j.shape[0])
+                step_size = 6
+
+                for start in range(0, num_channels, step_size):
+                    end = min(start + step_size, num_channels)  # 确保不越界
+
+                    # 截取整个区间的数据
+                    if type == 'raw':
+                        xi = data_i[start:end, :, :].reshape(-1)  # 将选定区间的所有数据合并为一维数组
+                        xj = data_j[start:end, :, :].reshape(-1)
+                    elif type == 'cnn_lstm':
+                        # 对每个区间的数据增加一个批量维度，以符合模型输入的需求
+                        xi_tensor = torch.tensor(data_i[start:end, :, :], dtype=torch.float32).unsqueeze(0).to(device)
+                        xj_tensor = torch.tensor(data_j[start:end, :, :], dtype=torch.float32).unsqueeze(0).to(device)
+                        xi = model(xi_tensor).detach().cpu().numpy().flatten()  # 从模型获取数据并展平
+                        xj = model(xj_tensor).detach().cpu().numpy().flatten()
+                    coeff, _ = pearsonr(xi, xj)
                     if not np.isnan(coeff) and not np.isinf(coeff):
                         coeffs.append(coeff)
                     else:
                         print(f"Found NaN or Inf values in correlation between {locations[i]} and {locations[j]}")
-                correlation_results[(locations[i], locations[j])] = np.mean(coeffs)
+
+                # 只在有有效系数时计算平均值
+                if coeffs:
+                    correlation_results[(locations[i], locations[j])] = np.mean(coeffs)
+                else:
+                    correlation_results[(locations[i], locations[j])] = 0
+
         return correlation_results
     
     def identify_ambiguous_locations(self, data_by_location, correlation_results, grid_size=0.5, avg_corrs=0.8):
@@ -111,41 +189,57 @@ class CSIDataHandler:
 
 
 
+
 # 使用
 data_directory = data_dir=os.getcwd()+"/dataset_test"
 handler = CSIDataHandler(data_directory)
 data_by_location = handler.load_data_by_location()
-correlation_results = handler.calculate_inter_location_correlation(data_by_location)
+
+# 原始数据的相关性
+correlation_results = handler.calculate_inter_location_correlation(data_by_location,type="raw")
 # 使用数据和相关系数来识别模糊点
 ambiguous_locations = handler.identify_ambiguous_locations(data_by_location, correlation_results)
+
+# lstm-cnn数据的相关性
+correlation_results_cnn_lstm = handler.calculate_inter_location_correlation(data_by_location,type="cnn_lstm")
+# 使用数据和相关系数来识别模糊点
+ambiguous_locations_cnn_lstm = handler.identify_ambiguous_locations(data_by_location, correlation_results_cnn_lstm)
 
 
 # 计算每个位置的模糊点数量
 ambiguous_counts = {loc: len(amb_locs) for loc, amb_locs in ambiguous_locations.items()}
+# 计算LSTM-CNN数据的模糊点数量
+ambiguous_counts_cnn_lstm = {loc: len(amb_locs) for loc, amb_locs in ambiguous_locations_cnn_lstm.items()}
 
 # 准备数据
-locations = sorted(ambiguous_counts.keys())  # 按位置标签排序
+locations = sorted(set(ambiguous_counts.keys()).union(set(ambiguous_counts_cnn_lstm.keys())))  # 合并所有位置并排序
 indices = range(len(locations))  # 创建对应的索引
-values = [ambiguous_counts[loc] for loc in locations]  # 获取排序后的模糊点数量
+values_raw = [ambiguous_counts.get(loc, 0) for loc in locations]  # 获取原始数据排序后的模糊点数量
+values_cnn_lstm = [ambiguous_counts_cnn_lstm.get(loc, 0) for loc in locations]  # 获取LSTM-CNN数据排序后的模糊点数量
 
 # 计算平均值
-mean_value = np.mean(values)
+mean_value_raw = np.mean(values_raw)
+mean_value_cnn_lstm = np.mean(values_cnn_lstm)
 
 # 可视化结果
-plt.figure(figsize=(10, 5))
-plt.scatter(indices, values, edgecolor='blue', facecolors='none', s=100, label="Before CNN-LSTM")  # 使用索引作为x轴
+plt.figure(figsize=(15, 8))
+plt.scatter(indices, values_raw, edgecolor='blue', facecolors='none', s=100, label="Before CNN-LSTM")  # 原始数据
+plt.scatter(indices, values_cnn_lstm, edgecolor='green', facecolors='none', s=100, label="After CNN-LSTM")  # LSTM-CNN处理后的数据
 
 # 添加每个点到横轴的垂直线
-for idx, value in zip(indices, values):
-    plt.plot([idx, idx], [0, value], color='blue', linestyle='--', linewidth=1)
+for idx, (value_raw, value_cnn_lstm) in enumerate(zip(values_raw, values_cnn_lstm)):
+    plt.plot([idx, idx], [0, value_raw], color='blue', linestyle='--', linewidth=1)
+    plt.plot([idx, idx], [0, value_cnn_lstm], color='green', linestyle='--', linewidth=1)
 
 # 添加平均值的水平虚线
-plt.axhline(y=mean_value, color='r', linestyle='--', label="Mean CNN-LSTM")
+plt.axhline(y=mean_value_raw, color='blue', linestyle='--', label="Mean Before CNN-LSTM")
+plt.axhline(y=mean_value_cnn_lstm, color='green', linestyle='--', label="Mean After CNN-LSTM")
 
-# plt.xticks(indices, [str(loc) for loc in locations], rotation=45)  # 使用位置标签作为x轴标签
-plt.xticks(indices, [index for index in indices], rotation=45)
+plt.xticks(indices, [index for index in indices], rotation=45)  # 使用位置标签作为x轴标签
 plt.xlabel('Location Index')
+plt.ylabel('Number of Ambiguous Locations')
 plt.ylabel('Ambiguous Locations')
 plt.legend()
 plt.grid(True)
 plt.show()
+plt.savefig(os.getcwd() + '/ambiguous_locations.png')  # 保存图像

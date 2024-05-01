@@ -80,15 +80,15 @@ class CNN_LSTM_Net(pl.LightningModule):
 
      # 每个epoch结束后执行,一个test_data_loader执行一次
     def on_test_epoch_end(self):
-        # 将损失列表转换为NumPy数组，计算CDF
-        losses = np.array(self.test_losses)
+        # 将损失列表转换为NumPy数组并四舍五入到指定的小数位数
+        losses = np.round(np.array(self.test_losses), decimals=2)  # 例如四舍五入到小数点后两位
         unique_losses, counts = np.unique(losses, return_counts=True)
         # 计算每个唯一损失值的累积分布百分比
         cumulative_distribution = np.cumsum(counts) / np.sum(counts)
 
         # 绘制CDF图，确保不包含平直线
         plt.figure(figsize=(8, 6))
-        plt.step(unique_losses, cumulative_distribution, where='post')  # 使用step绘图，避免线性插值
+        plt.step(unique_losses, cumulative_distribution,linestyle='-', linewidth=2)  # 使用step绘图，避免线性插值
         plt.xlabel('Distance Error (meter)')
         plt.ylabel('CNN_LSTM CDF')
         plt.grid(True)

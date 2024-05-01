@@ -55,19 +55,19 @@ class CSIDataset(Dataset):
             return self.cache[key]
         else:
             print(f"Loading and processing {file_path}")
-            df = pd.read_csv(file_path)
+            df = pd.read_csv(file_path, na_values='#NAME?')  # Replace '#NAME?' with NaN
             amplitude_data = df.filter(regex='^amplitude_').values.astype(np.float32)
             phase_data = df.filter(regex='^phase_').values.astype(np.float32)
             
-            # 应用中值滤波和最小-最大规范化
+            # Apply median filter and min-max normalization
             amplitude_data = min_max_normalization(median_filter(amplitude_data))
             phase_data = min_max_normalization(median_filter(phase_data))
             
-            # 转换为Tensor并移至GPU
+            # Convert to Tensor and move to GPU
             amplitude_tensor = torch.tensor(amplitude_data, dtype=torch.float32).to(device)
             phase_tensor = torch.tensor(phase_data, dtype=torch.float32).to(device)
             
-            self.cache[key] = (amplitude_tensor, phase_tensor)  # 存储处理后的张量
+            self.cache[key] = (amplitude_tensor, phase_tensor)  # Store processed tensors
             if len(self.cache) > self.cache_size:
                 self.cache.popitem(last=False)
             return self.cache[key]

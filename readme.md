@@ -50,4 +50,5 @@ csi_dataset.py 数据集
 cnn_net_model.py cnn 模型
 cnn_lstm_net_model.py cnn+lstm模型
 csi.pdf 复现的论文
+ambiguous_location.py 模糊位置图
 ```

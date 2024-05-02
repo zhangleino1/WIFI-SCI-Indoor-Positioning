@@ -79,10 +79,11 @@ class CNN_Net(pl.LightningModule):
     def on_test_epoch_end(self):
         # 将损失列表转换为NumPy数组，计算CDF
         losses = np.array(self.test_losses)
+        losses = np.round(np.array(self.test_losses), decimals=1)  # 例如四舍五入到小数点后两位
         unique_losses, counts = np.unique(losses, return_counts=True)
         # 计算每个唯一损失值的累积分布百分比
         cumulative_distribution = np.cumsum(counts) / np.sum(counts)
-
+        
         # 绘制CDF图，确保不包含平直线
         plt.figure(figsize=(8, 6))
         plt.step(unique_losses, cumulative_distribution, where='post')  # 使用step绘图，避免线性插值

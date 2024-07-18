@@ -52,3 +52,5 @@ cnn_lstm_net_model.py cnn+lstm模型
 csi.pdf 复现的论文
 ambiguous_location.py 模糊位置图
 ```
+# Email
+zhangleilikejay@gmail.com

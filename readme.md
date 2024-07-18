@@ -34,7 +34,6 @@ pip install -U 'tensorboard'
 ```
 # csi data image filter
 
-# filter image
 ![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/1.png)
 ![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/2.png)
 ![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/3.png)

@@ -32,6 +32,14 @@ conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
 ```
+# csi data image filter
+
+# filter image
+![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/1.png)
+![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/2.png)
+![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/3.png)
+![4](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/4.png)
+
 # 数据集
 csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 

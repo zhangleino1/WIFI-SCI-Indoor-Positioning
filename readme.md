@@ -1,4 +1,4 @@
-![image](https://github.com/user-attachments/assets/20d2de9b-0401-4dda-a9be-4d78461ecc9f)![image](https://github.com/user-attachments/assets/27c4d580-e34c-4248-ae41-8135dbd29f71)
+
 
 **Project Name:** 
 WIFI-SCI-Indoor-Positioning
@@ -40,7 +40,7 @@ pip install -U 'tensorboard'
 ![4](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/4.png)
 
 # research
-![1]((https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/Figure_1.png)
+![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/Figure_1.png)
 ![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/cnn_cdf.png)
 ![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/微信图片_20240718185423.png)
 

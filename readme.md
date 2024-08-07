@@ -28,7 +28,8 @@ Our objective is to develop and refine models that can interpret complex pattern
 
 # 室内定位算法定制
 如果你也想定制自己的室内定位算法，请联系我！
-公众号【程序员石磊】![公众号](https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png)
+
+![公众号](https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png)
 
 # 报错 注意安装
 ```

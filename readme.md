@@ -58,6 +58,9 @@ csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
 [dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
 
+# 复现论文
+csi.pdf
+
 # 文件说明
 本项目基于 pytorch lightning 
 ```

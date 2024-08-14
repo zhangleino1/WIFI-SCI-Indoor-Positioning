@@ -26,10 +26,38 @@ Our objective is to develop and refine models that can interpret complex pattern
 - Enabling location-based services and advertisements.
 - Improving safety and security monitoring by providing precise location tracking within indoor spaces.
 
+# 复现论文
+csi.pdf
+
 # 室内定位算法定制
 如果你也想定制自己的室内定位算法，请联系我！
 
 ![公众号](https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png)
+
+# 数据集
+csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
+
+[csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
+
+[dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
+
+
+
+# 文件说明
+本项目基于 pytorch lightning 
+```
+main.py  训练，预测入口
+data_process.py  dat文件转成csv 方便快读读取
+util.py  规范化，中值滤波
+heatmappic.py 热力图生成
+csi_dataset.py 数据集
+cnn_net_model.py cnn 模型
+cnn_lstm_net_model.py cnn+lstm模型
+csi.pdf 复现的论文
+ambiguous_location.py 模糊位置图
+```
+# Email
+zhangleilikejay@gmail.com
 
 # 报错 注意安装
 ```
@@ -51,28 +79,4 @@ pip install -U 'tensorboard'
 ![4](https://cdn.nlark.com/yuque/0/2024/png/354158/1721299909950-46a16f6b-cbd8-40fb-9833-35be7e0d0c5c.png?x-oss-process=image%2Fformat%2Cwebp%2Fresize%2Cw_1303%2Climit_0)
 
 
-# 数据集
-csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
-[csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
-
-[dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
-
-# 复现论文
-csi.pdf
-
-# 文件说明
-本项目基于 pytorch lightning 
-```
-main.py  训练，预测入口
-data_process.py  dat文件转成csv 方便快读读取
-util.py  规范化，中值滤波
-heatmappic.py 热力图生成
-csi_dataset.py 数据集
-cnn_net_model.py cnn 模型
-cnn_lstm_net_model.py cnn+lstm模型
-csi.pdf 复现的论文
-ambiguous_location.py 模糊位置图
-```
-# Email
-zhangleilikejay@gmail.com

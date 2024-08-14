@@ -27,7 +27,7 @@ Our objective is to develop and refine models that can interpret complex pattern
 - Improving safety and security monitoring by providing precise location tracking within indoor spaces.
 
 # 复现论文
-csi.pdf
+csi.pdf 仔细看在项目中
 
 # 室内定位算法定制
 如果你也想定制自己的室内定位算法，请联系我！

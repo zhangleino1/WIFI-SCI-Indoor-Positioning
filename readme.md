@@ -69,6 +69,9 @@ conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
 ```
+# 遗留问题
+- wifi指纹是分类任务，我之前搞的是回归，这里需要优化下
+
 # csi data image filter
 
 ![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/1.png)

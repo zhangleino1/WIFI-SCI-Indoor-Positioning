@@ -86,4 +86,6 @@ pip install -U 'tensorboard'
 ![4](https://cdn.nlark.com/yuque/0/2024/png/354158/1721299909950-46a16f6b-cbd8-40fb-9833-35be7e0d0c5c.png?x-oss-process=image%2Fformat%2Cwebp%2Fresize%2Cw_1303%2Climit_0)
 
 
+## Star History
 
+[![Star History Chart](https://api.star-history.com/svg?repos=zhangleino1/WIFI-SCI-Indoor-Positioning&type=Date)](https://star-history.com/#zhangleino1/WIFI-SCI-Indoor-Positioning&Date)

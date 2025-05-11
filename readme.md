@@ -1,5 +1,3 @@
-
-
 **Project Name:** 
 WIFI-SCI-Indoor-Positioning
 
@@ -59,18 +57,125 @@ cnn_net_model.py cnn 模型
 cnn_lstm_net_model.py cnn+lstm模型
 csi.pdf 复现的论文
 ambiguous_location.py 模糊位置图
+visualize_locations.py 位置类别可视化
+visualize_classification.py 分类结果可视化
+analyze_spatial_confusion.py 空间混淆分析
 ```
+
+# Python 实现说明
+
+## 数据集处理 (csi_dataset.py)
+- 采用 PyTorch 的 Dataset 和 DataLoader 机制处理 CSI 数据
+- 使用 OrderedDict 实现了高效的数据缓存机制，提高训练速度
+- 将 (x,y) 坐标作为位置类别，实现了从回归任务到分类任务的转换
+- 自动提取数据集中所有唯一位置并创建位置到类别索引的映射
+
+## 网络模型 (cnn_net_model.py, cnn_lstm_net_model.py)
+- 使用 PyTorch Lightning 框架实现了高级模型接口
+- CNN 模型：使用三层卷积提取 CSI 数据的空间特征
+- CNN_LSTM 模型：在卷积网络基础上增加 LSTM 层，同时捕获时间和空间特征
+- 实现了从回归输出到分类输出的转换，使用 CrossEntropyLoss 代替 MSELoss
+- 添加了准确率监控和混淆矩阵可视化功能
+
+## 训练与评估 (main.py)
+- 支持 GPU 加速训练
+- 实现了早停、学习率调整等高级训练策略
+- 提供命令行参数支持不同的模型配置
+- 新增基于准确率的模型监控，可通过 `--monitor_metric accuracy` 参数启用
+
+## 数据可视化
+- visualize_locations.py: 可视化室内定位的位置类别分布
+- visualize_classification.py: 分析分类结果，生成混淆矩阵和准确率热图
+- analyze_spatial_confusion.py: 分析位置误差与物理距离的关系
+- ambiguous_location.py: 使用相关性分析识别容易混淆的位置对
+
+## 使用示例
+
+### 训练分类模型
+```powershell
+python main.py --model_type cnn_lstm --monitor_metric accuracy --data_dir ./dataset
+```
+
+### 位置类别可视化
+```powershell
+python visualize_locations.py --data_dir ./dataset
+```
+
+### 评估分类性能
+```powershell
+python visualize_classification.py --model_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt --model_type cnn_lstm
+```
+
+### 分析空间混淆
+```powershell
+python analyze_spatial_confusion.py --model_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt --model_type cnn_lstm
+```
+
 # Email
 zhangleilikejay@gmail.com
+
+# 技术细节
+
+## 环境要求
+- Python 3.8+
+- PyTorch 1.12+
+- PyTorch Lightning 1.6+
+- 建议在 CUDA 环境下训练以提高速度
+
+## 数据格式
+- 数据文件命名格式: `antenna_<天线号>_<x坐标>_<y坐标>.csv`
+- 每个 CSV 文件包含幅度和相位数据
+- 幅度列名格式: `amplitude_0`, `amplitude_1`, ...
+- 相位列名格式: `phase_0`, `phase_1`, ...
+
+## 分类实现关键点
+1. **类别映射**: 将每个唯一的 (x,y) 坐标作为一个分类类别
+   ```python
+   self.location_to_class = {loc: idx for idx, loc in enumerate(sorted(self.location_classes))}
+   ```
+
+2. **模型输出层**: 从回归输出(2个神经元)改为类别数量的神经元
+   ```python
+   self.fc3 = nn.Linear(900, num_classes)  # 输出类别数量的神经元
+   ```
+
+3. **损失函数**: 从 MSE 损失改为交叉熵损失
+   ```python
+   loss = F.cross_entropy(logits, targets)
+   ```
+
+4. **准确率评估**: 在训练、验证和测试阶段添加准确率指标
+   ```python
+   preds = torch.argmax(logits, dim=1)
+   acc = (preds == targets).float().mean()
+   ```
+
+## 可视化分析方法
+- **混淆矩阵分析**: 识别易混淆的位置类别
+- **位置准确率热图**: 直观展示哪些区域定位更准确
+- **物理距离误差分析**: 分析分类错误与物理距离的关系
 
 # 报错 注意安装
 ```
 conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
+# 可能还需要安装的依赖
+pip install scikit-learn matplotlib seaborn
 ```
-# 遗留问题
-- wifi指纹是分类任务，我之前搞的是回归，这里需要优化下
+
+# 更新说明
+- 已完成将回归任务转换为分类任务，优化了室内定位算法
+- 添加了新的可视化脚本，支持位置类别、分类结果和空间混淆的分析
+- 增强了模型评估功能，可通过混淆矩阵和准确率热图分析性能
+- 模型训练现在可以通过准确率(accuracy)或损失(loss)来监控和选择最佳模型
+- 添加了详细的[使用指南](./USAGE_GUIDE.md)，包含环境配置、数据处理、模型训练和结果分析等详细说明
+
+# 可能的未来优化方向
+- 实现基于注意力机制的深度学习模型，进一步提高定位精度
+- 添加多传感器融合功能，结合其他定位数据源
+- 开发在线学习模块，使系统能够适应环境变化
+- 增加少样本学习能力，减少每个位置需要的训练数据量
 
 # csi data image filter
 

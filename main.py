@@ -11,18 +11,22 @@ import os
 
 
 def get_callbacks(args):
+    monitor_metric = 'val_acc' if args.monitor_metric == 'accuracy' else 'val_loss'
+    mode = 'max' if args.monitor_metric == 'accuracy' else 'min'
+    
     checkpoint_callback = ModelCheckpoint(
-        monitor='val_loss',
-        filename=f"{args.model_type}-best-{{epoch:02d}}-{{val_loss:.3f}}",
+        monitor=monitor_metric,
+        filename=f"{args.model_type}-best-{{epoch:02d}}-{{{monitor_metric}:.3f}}",
         save_top_k=1,
-        mode='min',
+        mode=mode,
         save_last=True
     )
     early_stopping = EarlyStopping(
-        monitor='val_loss',
+        monitor=monitor_metric,
         min_delta=0.001,
         patience=10,
-        verbose=True
+        verbose=True,
+        mode=mode
     )
 
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
@@ -34,8 +38,8 @@ def train(args):
     data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,
                                 time_step=args.time_step, data_dir=args.data_dir, stride=args.stripe)
 
-    # 设置模型
-    model = get_model(args)
+    # 设置模型 - 传递分类数量
+    model = get_model(args, data_module.num_classes)
 
 
     # 设置日志
@@ -61,31 +65,48 @@ def train(args):
      # Test the model
     trainer.test(model,data_module)
 
-def get_model(args):
+def get_model(args, num_classes):
     if args.model_type == 'cnn':
-        return CNN_Net(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        return CNN_Net(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps, num_classes=num_classes)
 
     elif args.model_type == 'cnn_lstm':
-        return CNN_LSTM_Net(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        return CNN_LSTM_Net(lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps, num_classes=num_classes)
     else:
         raise ValueError("Invalid model type specified")
 
 def test(args):
+    # 首先创建数据模块以获取类别数量
+    data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,
+                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stripe)
+    
     logger = TensorBoardLogger(
             save_dir="./logs",
             name=f"{args.model_type}test"
         )
 
-        # 将 Namespace 对象转换为字典
+    # 将 Namespace 对象转换为字典
     hparams_dict = vars(args)
     if args.model_type == 'cnn':
-        model = CNN_Net.load_from_checkpoint(args.cpt_path,lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        model = CNN_Net.load_from_checkpoint(
+            args.cpt_path,
+            lr=args.lr, 
+            lr_factor=args.lr_factor, 
+            lr_patience=args.lr_patience, 
+            lr_eps=args.lr_eps,
+            num_classes=data_module.num_classes
+        )
     elif args.model_type == 'cnn_lstm':
-        model = CNN_LSTM_Net.load_from_checkpoint(args.cpt_path,lr=args.lr, lr_factor=args.lr_factor, lr_patience=args.lr_patience, lr_eps=args.lr_eps)
+        model = CNN_LSTM_Net.load_from_checkpoint(
+            args.cpt_path,
+            lr=args.lr, 
+            lr_factor=args.lr_factor, 
+            lr_patience=args.lr_patience, 
+            lr_eps=args.lr_eps,
+            num_classes=data_module.num_classes
+        )
     else:
         raise ValueError("Invalid model type specified")
-    data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,
-                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stripe)
+    
     accelerator = 'gpu' if torch.cuda.is_available() else 'cpu'
     trainer = pl.Trainer(
         accelerator=accelerator,
@@ -121,6 +142,8 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, default='cnn_lstm', choices=['cnn', 'cnn_lstm'],
                         help='Model type to train/test')
     parser.add_argument('--cpt_path', default=os.getcwd() + '/checkpoints/last.ckpt', type=str)
+    parser.add_argument('--monitor_metric', choices=['loss', 'accuracy'], default='accuracy',
+                       help='Metric to monitor for checkpointing and early stopping (loss or accuracy)')
     
     args = parser.parse_args()
     if args.mode == 'test':

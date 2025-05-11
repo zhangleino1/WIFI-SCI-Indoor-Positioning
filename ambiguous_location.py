@@ -5,30 +5,17 @@ from torch.utils.data import DataLoader
 from scipy.stats import pearsonr
 import torch
 import torch.nn as nn
-from csi_dataset import CSIDataModule
+from csi_dataset import CSIDataModule, CSIDataset
 import os
 from util import min_max_normalization, median_filter
-# 假设CSIDataset类和CSIDataModule类已经在上文给出，并正确导入
-
-# 初始化数据模块
-import pandas as pd
-import numpy as np
-from scipy.stats import pearsonr
-import os
-import glob
-import matplotlib.pyplot as plt
 import re
-
-
-import torch.nn as nn
+import glob
 import torch.nn.functional as F
 import pytorch_lightning as pl
 
 class CNN_LSTM_Net(nn.Module):
     def __init__(self):
         super().__init__()
-      
-        self.test_losses = []  # 初始化空列表以收集测试损失
         
         # 卷积层
         self.conv1 = nn.Conv2d(in_channels=6, out_channels=18, kernel_size=5, padding=2)
@@ -41,8 +28,8 @@ class CNN_LSTM_Net(nn.Module):
         # LSTM层
         self.lstm = nn.LSTM(input_size=18*30, hidden_size=100, batch_first=True)
 
-        # 输出层
-        self.fc = nn.Linear(100, 2)
+        # 特征提取后不需要最终的输出层，因为我们只要提取特征
+        # 注意：原来的输出层 self.fc = nn.Linear(100, 2) 不再需要
 
         # 用于存储LSTM特征的属性
         self.lstm_features = None
@@ -60,22 +47,39 @@ class CNN_LSTM_Net(nn.Module):
         lstm_out, _ = self.lstm(x)
         self.lstm_features = lstm_out[:, -1, :]  # 存储最后一个时间步的特征
         
-        # 经过一个全连接层输出最终的二维坐标
-        x = self.fc(self.lstm_features)
         return self.lstm_features
-
-
-        
 
 # 加载模型
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = CNN_LSTM_Net().to(device)
+
+# First, get the dataset to understand number of classes
+# Note: We need this for loading the model properly even if we just use the features
+data_directory = os.getcwd()+"/dataset_test"
+temp_dataset = CSIDataset(directory=data_directory, time_step=30, stride=1)
+num_classes = temp_dataset.num_classes
+print(f"Found {num_classes} location classes")
+
+# Load only the feature extraction part of the model
 # 注意修改路径
-model_path = os.getcwd() + '/logs/cnn_lstm/version_2/checkpoints/last.ckpt'
-model.load_state_dict(torch.load(model_path)['state_dict'])
+model_path = os.getcwd() + '/logs/cnn_lstm/version_0/checkpoints/last.ckpt'
+try:
+    # Try to load the state dict directly
+    checkpoint = torch.load(model_path)
+    
+    # Extract only the CNN and LSTM layers from the checkpoint
+    state_dict = checkpoint['state_dict']
+    # 过滤出仅特征提取部分的参数
+    feature_extractor_dict = {k.replace('conv1', 'conv1'): v for k, v in state_dict.items() if 'fc' not in k}
+    
+    # Load the filtered state dict
+    model.load_state_dict(feature_extractor_dict, strict=False)
+    print("Model loaded successfully with filtered weights")
+except Exception as e:
+    print(f"Error loading model: {e}")
+    print("Using untrained model - results may not be accurate")
+
 model.eval()  # 设置为评估模式
-
-
 
 class CSIDataHandler:
     def __init__(self, data_directory, time_steps=30):
@@ -187,9 +191,6 @@ class CSIDataHandler:
 
         return ambiguous_points
 
-
-
-
 # 使用
 data_directory = data_dir=os.getcwd()+"/dataset_test"
 handler = CSIDataHandler(data_directory)
@@ -204,7 +205,6 @@ ambiguous_locations = handler.identify_ambiguous_locations(data_by_location, cor
 correlation_results_cnn_lstm = handler.calculate_inter_location_correlation(data_by_location,type="cnn_lstm")
 # 使用数据和相关系数来识别模糊点
 ambiguous_locations_cnn_lstm = handler.identify_ambiguous_locations(data_by_location, correlation_results_cnn_lstm)
-
 
 # 计算每个位置的模糊点数量
 ambiguous_counts = {loc: len(amb_locs) for loc, amb_locs in ambiguous_locations.items()}
@@ -223,8 +223,8 @@ mean_value_cnn_lstm = np.mean(values_cnn_lstm)
 
 # 可视化结果
 plt.figure(figsize=(15, 8))
-plt.scatter(indices, values_raw, edgecolor='blue', facecolors='none', s=100, label="Before CNN-LSTM")  # 原始数据
-plt.scatter(indices, values_cnn_lstm, edgecolor='green', facecolors='none', s=100, label="After CNN-LSTM")  # LSTM-CNN处理后的数据
+plt.scatter(indices, values_raw, edgecolor='blue', facecolors='none', s=100, label="Raw Features")  # 原始数据
+plt.scatter(indices, values_cnn_lstm, edgecolor='green', facecolors='none', s=100, label="CNN-LSTM Features")  # LSTM-CNN处理后的数据
 
 # 添加每个点到横轴的垂直线
 for idx, (value_raw, value_cnn_lstm) in enumerate(zip(values_raw, values_cnn_lstm)):
@@ -232,14 +232,19 @@ for idx, (value_raw, value_cnn_lstm) in enumerate(zip(values_raw, values_cnn_lst
     plt.plot([idx, idx], [0, value_cnn_lstm], color='green', linestyle='--', linewidth=1)
 
 # 添加平均值的水平虚线
-plt.axhline(y=mean_value_raw, color='blue', linestyle='--', label="Mean Before CNN-LSTM")
-plt.axhline(y=mean_value_cnn_lstm, color='green', linestyle='--', label="Mean After CNN-LSTM")
+plt.axhline(y=mean_value_raw, color='blue', linestyle='--', label="Mean (Raw Features)")
+plt.axhline(y=mean_value_cnn_lstm, color='green', linestyle='--', label="Mean (CNN-LSTM Features)")
 
-plt.xticks(indices, [index for index in indices], rotation=45)  # 使用位置标签作为x轴标签
-plt.xlabel('Location Index')
+# 标记实际位置而不仅仅是索引
+location_labels = [f"({loc[0]},{loc[1]})" for loc in locations]
+plt.xticks(indices, location_labels, rotation=45)
+
+# 改进标签
+plt.xlabel('Location Position (x,y)')
 plt.ylabel('Number of Ambiguous Locations')
-plt.ylabel('Ambiguous Locations')
+plt.title('Location Ambiguity Reduction with CNN-LSTM Classification')
 plt.legend()
 plt.grid(True)
+plt.tight_layout()  # 确保标签不会被切掉
+plt.savefig(os.getcwd() + '/ambiguous_locations.png', dpi=300)  # 高分辨率保存
 plt.show()
-plt.savefig(os.getcwd() + '/ambiguous_locations.png')  # 保存图像

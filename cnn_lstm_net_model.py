@@ -5,14 +5,18 @@ from torch.nn import functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+from sklearn.metrics import accuracy_score, confusion_matrix
+
 class CNN_LSTM_Net(pl.LightningModule):
-    def __init__(self, lr, lr_factor, lr_patience, lr_eps):
+    def __init__(self, lr, lr_factor, lr_patience, lr_eps, num_classes=0):
         super().__init__()
         self.lr = lr
         self.lr_factor = lr_factor
         self.lr_patience = lr_patience
         self.lr_eps = lr_eps
-        self.test_losses = []  # 初始化空列表以收集测试损失
+        self.num_classes = num_classes
+        self.test_preds = []
+        self.test_targets = []
         
         # 卷积层
         self.conv1 = nn.Conv2d(in_channels=6, out_channels=18, kernel_size=5, padding=2)
@@ -25,8 +29,8 @@ class CNN_LSTM_Net(pl.LightningModule):
         # LSTM层
         self.lstm = nn.LSTM(input_size=18*30, hidden_size=100, batch_first=True)  # 每行作为一个时间步
 
-        # 输出层
-        self.fc = nn.Linear(100, 2)  # 输出二维坐标
+        # 输出层 - 修改为输出到类别数量
+        self.fc = nn.Linear(100, num_classes)
 
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
@@ -41,60 +45,98 @@ class CNN_LSTM_Net(pl.LightningModule):
         x, _ = self.lstm(x)
         x = x[:, -1, :]  # 取最后一个时间步的输出
 
-        # 经过一个全连接层输出最终的二维坐标
+        # 经过一个全连接层输出类别预测
         x = self.fc(x)
         return x
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.lr)
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=self.lr_factor, patience=self.lr_patience, eps=self.lr_eps)
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, 
+            mode='max',  # When monitoring accuracy, we want to maximize it
+            factor=self.lr_factor, 
+            patience=self.lr_patience, 
+            eps=self.lr_eps
+        )
         return {
             'optimizer': optimizer,
             'lr_scheduler': {
                 'scheduler': scheduler,
-                'monitor': 'val_loss',
+                'monitor': 'val_acc',  # Monitor validation accuracy
             },
         }
 
     def training_step(self, batch, batch_idx):
         data, targets = batch
-        outputs = self(data)
-        loss = F.mse_loss(outputs, targets)
-        self.log('train_loss', loss,on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        logits = self(data)
+        loss = F.cross_entropy(logits, targets)
+        
+        # 计算准确率
+        preds = torch.argmax(logits, dim=1)
+        acc = (preds == targets).float().mean()
+        
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
         data, targets = batch
-        outputs = self(data)
-        loss = F.mse_loss(outputs, targets)
-        self.log('val_loss', loss,on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        logits = self(data)
+        loss = F.cross_entropy(logits, targets)
+        
+        # 计算准确率
+        preds = torch.argmax(logits, dim=1)
+        acc = (preds == targets).float().mean()
+        
+        self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def test_step(self, batch, batch_idx):
         data, targets = batch
-        outputs = self(data)
-        loss = F.mse_loss(outputs, targets)
-        self.log('test_loss', loss,on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.test_losses.append(loss.item())  # 将损失加入列表
+        logits = self(data)
+        loss = F.cross_entropy(logits, targets)
+        
+        # 计算准确率
+        preds = torch.argmax(logits, dim=1)
+        acc = (preds == targets).float().mean()
+        
+        self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('test_acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        
+        # 保存预测和目标，用于计算混淆矩阵
+        self.test_preds.extend(preds.cpu().numpy())
+        self.test_targets.extend(targets.cpu().numpy())
+        
         return loss
 
-     # 每个epoch结束后执行,一个test_data_loader执行一次
+    # 每个epoch结束后执行,一个test_data_loader执行一次
     def on_test_epoch_end(self):
-        # 将损失列表转换为NumPy数组并四舍五入到指定的小数位数
-        losses = np.round(np.array(self.test_losses), decimals=1)  # 例如四舍五入到小数点后两位
-        unique_losses, counts = np.unique(losses, return_counts=True)
-        # 计算每个唯一损失值的累积分布百分比
-        cumulative_distribution = np.cumsum(counts) / np.sum(counts)
-
-        # 绘制CDF图，确保不包含平直线
-        plt.figure(figsize=(8, 6))
-        plt.step(unique_losses, cumulative_distribution,linestyle='-', linewidth=2)  # 使用step绘图，避免线性插值
-        plt.xlabel('Distance Error (meter)')
-        plt.ylabel('CNN_LSTM CDF')
-        plt.grid(True)
-        plt.savefig(os.getcwd() + '/cnn_lstm_cdf.png')  # 保存图像
-        plt.show()
-
-        # 清空测试损失列表，为下一次测试准备
-        self.test_losses = []
-        print('on_test_epoch_end')
+        # 计算准确率和混淆矩阵
+        accuracy = accuracy_score(self.test_targets, self.test_preds)
+        conf_matrix = confusion_matrix(self.test_targets, self.test_preds)
+        
+        print(f"Test Accuracy: {accuracy:.4f}")
+        print("Confusion Matrix:")
+        print(conf_matrix)
+        
+        # 可视化混淆矩阵
+        plt.figure(figsize=(10, 8))
+        plt.imshow(conf_matrix, cmap='Blues')
+        plt.colorbar()
+        plt.title(f'CNN_LSTM Classification Confusion Matrix\nAccuracy: {accuracy:.4f}')
+        plt.xlabel('Predicted Labels')
+        plt.ylabel('True Labels')
+        
+        # 添加数字标签到混淆矩阵
+        for i in range(conf_matrix.shape[0]):
+            for j in range(conf_matrix.shape[1]):
+                plt.text(j, i, str(conf_matrix[i, j]), 
+                         ha="center", va="center", color="white" if conf_matrix[i, j] > conf_matrix.max()/2 else "black")
+        
+        plt.savefig(os.getcwd() + '/cnn_lstm_confusion_matrix.png')
+        
+        # 清空测试预测和目标列表，为下一次测试准备
+        self.test_preds = []
+        self.test_targets = []
+        print('on_test_epoch_end completed')

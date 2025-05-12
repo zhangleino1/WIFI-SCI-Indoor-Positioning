@@ -89,27 +89,9 @@ analyze_spatial_confusion.py 空间混淆分析
 - analyze_spatial_confusion.py: 分析位置误差与物理距离的关系
 - ambiguous_location.py: 使用相关性分析识别容易混淆的位置对
 
-## 使用示例
+## 详细使用说明
 
-### 训练分类模型
-```powershell
-python main.py --model_type cnn_lstm --monitor_metric accuracy --data_dir ./dataset
-```
-
-### 位置类别可视化
-```powershell
-python visualize_locations.py --data_dir ./dataset
-```
-
-### 评估分类性能
-```powershell
-python visualize_classification.py --model_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt --model_type cnn_lstm
-```
-
-### 分析空间混淆
-```powershell
-python analyze_spatial_confusion.py --model_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt --model_type cnn_lstm
-```
+详细的[使用指南](./USAGE_GUIDE.md)，包含环境配置、数据处理、模型训练和结果分析等详细说明
 
 # Email
 zhangleilikejay@gmail.com
@@ -163,6 +145,8 @@ pip install -U 'tensorboard'
 # 可能还需要安装的依赖
 pip install scikit-learn matplotlib seaborn
 ```
+
+
 
 # 更新说明
 - 已完成将回归任务转换为分类任务，优化了室内定位算法

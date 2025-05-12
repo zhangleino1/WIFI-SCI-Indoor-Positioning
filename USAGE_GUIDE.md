@@ -65,8 +65,20 @@ python heatmappic.py --data_dir ./dataset
 
 ### 基础训练命令
 ```powershell
-python main.py --model_type cnn_lstm --data_dir ./dataset
+python main.py --model_type cnn_lstm --data_dir ./dataset --mode train
 ```
+
+### 训练与测试模式说明
+系统提供两种运行模式：
+- **训练模式 (--mode train)**: 用于从头开始训练模型，会创建新的模型并保存到日志目录
+- **测试模式 (--mode test)**: 用于加载已训练的模型并进行测试，需要配合 `--cpt_path` 使用
+
+### 模型检查点 (Checkpoint) 说明
+训练模型后，系统会自动保存检查点文件到以下路径：
+```
+./logs/<model_type>/version_<N>/checkpoints/
+```
+其中包含 `last.ckpt` (最后一个检查点) 和最佳性能的检查点。这些检查点可以通过 `--cpt_path` 参数加载进行测试或继续训练。
 
 ### 常用参数说明
 - `--model_type`: 选择模型类型，可选 'cnn' 或 'cnn_lstm'
@@ -75,6 +87,8 @@ python main.py --model_type cnn_lstm --data_dir ./dataset
 - `--lr`: 学习率，默认为0.0001
 - `--max_epochs`: 最大训练轮次，默认为120
 - `--monitor_metric`: 监控指标，可选 'accuracy' 或 'loss'，默认为'accuracy'
+- `--mode`: 运行模式，可选 'train' 或 'test'，默认为'train'。'train'用于训练新模型，'test'用于测试现有模型
+- `--cpt_path`: 模型检查点路径，用于加载已训练的模型进行测试，默认为当前工作目录下的'/checkpoints/last.ckpt'
 
 ### 高级训练选项
 ```powershell
@@ -84,8 +98,21 @@ python main.py --model_type cnn_lstm --data_dir ./dataset --batch_size 64 --lr 0
 ## 性能评估
 
 ### 测试已训练模型
+使用 `--mode test` 和 `--cpt_path` 参数测试已训练的模型性能：
+
 ```powershell
 python main.py --mode test --model_type cnn_lstm --data_dir ./dataset --cpt_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt
+```
+
+### 测试不同检查点的模型
+您可以通过更改 `--cpt_path` 参数来测试不同阶段保存的模型：
+
+```powershell
+# 测试最后保存的检查点
+python main.py --mode test --model_type cnn_lstm --cpt_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt
+
+# 测试最佳性能检查点
+python main.py --mode test --model_type cnn_lstm --cpt_path ./logs/cnn_lstm/version_0/checkpoints/cnn_lstm-best-epoch=45-val_acc=0.987.ckpt
 ```
 
 ### 深入分析分类性能

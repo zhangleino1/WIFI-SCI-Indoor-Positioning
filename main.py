@@ -130,7 +130,7 @@ if __name__ == '__main__':
     parser.add_argument("--lr_patience", type=int, default=10, help="Number of epochs with no improvement after which learning rate will be reduced")
     parser.add_argument("--lr_eps", type=float, default=1e-6, help="Epsilon for learning rate reduction")
     parser.add_argument("--time_step", type=int, default=30, help="Time steps to use for each sample")
-    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset_test", help="Directory for output")
+    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset", help="Directory for output")
     parser.add_argument('--min_epochs', default=10, type=int)
     parser.add_argument('--max_epochs', default=120, type=int)
     parser.add_argument('--min_steps', type=int, default=5)

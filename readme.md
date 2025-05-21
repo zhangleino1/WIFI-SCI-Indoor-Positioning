@@ -24,6 +24,45 @@ Our objective is to develop and refine models that can interpret complex pattern
 - Enabling location-based services and advertisements.
 - Improving safety and security monitoring by providing precise location tracking within indoor spaces.
 
+Below is the translated Chinese version of your project description:
+
+---
+
+## 项目名称：
+WIFI-SCI-室内定位
+
+---
+
+## 项目描述：
+**WIFI-SCI-室内定位**是一个创新的开源项目，旨在利用深度学习技术，通过WiFi信道状态信息（CSI）实现精准的室内定位。本项目充分利用CSI提供的丰富数据，包括信号的幅度、相位以及传播环境信息，从而在GPS信号不可靠的室内环境中准确估算设备位置。
+
+---
+
+## 项目目标：
+我们的目标是开发和完善模型，使其能够解读CSI数据中的复杂模式，从而根据WiFi信号反映的环境特征准确检测设备的位置。
+
+---
+
+## 工作原理：
+* **数据收集：** 我们从WiFi网络收集CSI数据，捕捉传统基于RSSI（接收信号强度指示）的系统所忽略的细节。
+* **模型训练：** 我们使用各种深度学习架构，如卷积神经网络（CNN）和循环神经网络（RNN），从CSI数据的时间和空间特征中进行学习。
+* **位置估算：** 经过训练的模型通过解释处理后的CSI数据来预测位置，同时考虑信号多径效应、衰落和阴影等因素。
+
+---
+
+## 主要特点：
+* **高精度：** 通过利用深度学习，本项目旨在显著提高室内定位的精度，超越传统方法。
+* **可扩展性：** 旨在与现有WiFi基础设施无缝协作，使其在不同环境中易于扩展。
+* **实时处理：** 能够处理实时数据以提供实时定位服务。
+* **社区驱动：** 鼓励研究人员和开发者的贡献，以进一步增强解决方案的功能和适应性。
+
+---
+
+## 潜在应用：
+* 增强机场、商场和医院等复杂室内环境的导航系统。
+* 实现基于位置的服务和广告。
+* 通过在室内空间提供精准的位置跟踪，提高安全监控水平。
+
 # 复现论文
 csi.pdf 仔细看在项目中
 
@@ -39,11 +78,11 @@ csi.pdf 仔细看在项目中
 # 数据集
 csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
-[csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
+[全量csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
 
-[dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
+[全量dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
 
-
+注意：dataset目录只是少量数据集用于测试，不少完整的。
 
 # 文件说明
 本项目基于 pytorch lightning 
@@ -163,15 +202,15 @@ pip install scikit-learn matplotlib seaborn
 
 # csi data image filter
 
-![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/1.png)
-![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/2.png)
-![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/3.png)
-![4](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/4.png)
+![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/1.png)
+![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/2.png)
+![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/3.png)
+![4](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/4.png)
 
 # research images
-![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/Figure_1.png)
-![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/cnn_cdf.png)
-![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/微信图片_20240718185423.png)
+![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/Figure_1.png)
+![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/cnn_cdf.png)
+![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/ambiguous_locations.png)
 ![4](https://cdn.nlark.com/yuque/0/2024/png/354158/1721299909950-46a16f6b-cbd8-40fb-9833-35be7e0d0c5c.png?x-oss-process=image%2Fformat%2Cwebp%2Fresize%2Cw_1303%2Climit_0)
 
 

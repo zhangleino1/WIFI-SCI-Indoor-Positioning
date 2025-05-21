@@ -87,13 +87,12 @@ python main.py --model_type cnn_lstm --data_dir ./dataset --mode train
 - `--batch_size`: 批大小，默认为128
 - `--lr`: 学习率，默认为0.0001
 - `--max_epochs`: 最大训练轮次，默认为120
-- `--monitor_metric`: 监控指标，可选 'accuracy' 或 'loss'，默认为'accuracy'
 - `--mode`: 运行模式，可选 'train' 或 'test'，默认为'train'。'train'用于训练新模型，'test'用于测试现有模型
 - `--cpt_path`: 模型检查点路径，用于加载已训练的模型进行测试，默认为当前工作目录下的'/checkpoints/last.ckpt'
 
 ### 高级训练选项
 ```powershell
-python main.py --model_type cnn_lstm --data_dir ./dataset --batch_size 64 --lr 0.0005 --max_epochs 200 --monitor_metric accuracy
+python main.py --model_type cnn_lstm --data_dir ./dataset --batch_size 64 --lr 0.0005 --max_epochs 200
 ```
 
 ## 性能评估

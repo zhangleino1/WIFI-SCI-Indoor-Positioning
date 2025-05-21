@@ -71,7 +71,7 @@ csi.pdf 仔细看在项目中
 
 喝杯咖啡，感谢开源，祝您毕业！
 
-![dashang](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/dashang.png)
+![dashang](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/dashang.png)
 
 ![公众号](https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png)
 

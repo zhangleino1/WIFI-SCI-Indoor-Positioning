@@ -17,7 +17,7 @@ def analyze_spatial_confusion(model_path, data_dir, model_type='cnn_lstm', batch
     data_module = CSIDataModule(
         batch_size=batch_size, 
         num_workers=4, 
-        time_step=30, 
+        time_step=15, 
         data_dir=data_dir,
         stride=1
     )
@@ -184,8 +184,8 @@ def analyze_spatial_confusion(model_path, data_dir, model_type='cnn_lstm', batch
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Analyze spatial confusion in indoor positioning")
-    parser.add_argument("--model_path", type=str, required=True, help="Path to trained model checkpoint")
-    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset_test", help="Directory containing CSI data")
+    parser.add_argument("--model_path", type=str, help="Path to trained model checkpoint",default=os.getcwd()+"/logs/cnn_lstm/version_2/checkpoints/cnn_lstm-best-epoch=22-val_loss=4.505.ckpt")
+    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset", help="Directory containing CSI data")
     parser.add_argument("--model_type", type=str, default='cnn_lstm', choices=['cnn', 'cnn_lstm'], help="Model type to evaluate")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size for evaluation")
     

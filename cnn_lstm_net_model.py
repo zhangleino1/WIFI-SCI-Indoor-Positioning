@@ -120,13 +120,28 @@ class CNN_LSTM_Net(pl.LightningModule):
         print("Confusion Matrix:")
         print(conf_matrix)
         
+        # 获取数据集的类别到位置的映射
+        # 假设我们可以通过trainer.datamodule访问数据集
+        class_to_location = self.trainer.datamodule.dataset.class_to_location
+        
         # 可视化混淆矩阵
-        plt.figure(figsize=(10, 8))
+        plt.figure(figsize=(12, 10))
         plt.imshow(conf_matrix, cmap='Blues')
         plt.colorbar()
         plt.title(f'CNN_LSTM Classification Confusion Matrix\nAccuracy: {accuracy:.4f}')
-        plt.xlabel('Predicted Labels')
-        plt.ylabel('True Labels')
+        
+        # 生成坐标标签
+        classes = sorted(list(class_to_location.keys()))
+        location_labels = [f"({class_to_location[c][0]},{class_to_location[c][1]})" for c in classes]
+        
+        # 设置轴标签
+        plt.xlabel('Predicted Location')
+        plt.ylabel('True Location')
+        
+        # 设置刻度位置和标签
+        tick_positions = np.arange(len(classes))
+        plt.xticks(tick_positions, location_labels, rotation=90, fontsize=8)
+        plt.yticks(tick_positions, location_labels, fontsize=8)
         
         # 添加数字标签到混淆矩阵
         for i in range(conf_matrix.shape[0]):
@@ -134,7 +149,8 @@ class CNN_LSTM_Net(pl.LightningModule):
                 plt.text(j, i, str(conf_matrix[i, j]), 
                          ha="center", va="center", color="white" if conf_matrix[i, j] > conf_matrix.max()/2 else "black")
         
-        plt.savefig(os.getcwd() + '/cnn_lstm_confusion_matrix.png')
+        plt.tight_layout()
+        plt.savefig(os.getcwd() + '/cnn_lstm_confusion_matrix.png', dpi=300)
         
         # 清空测试预测和目标列表，为下一次测试准备
         self.test_preds = []

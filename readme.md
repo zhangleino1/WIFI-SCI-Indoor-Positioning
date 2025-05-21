@@ -95,7 +95,6 @@ csi_dataset.py 数据集
 cnn_net_model.py cnn 模型
 cnn_lstm_net_model.py cnn+lstm模型
 csi.pdf 复现的论文
-ambiguous_location.py 模糊位置图
 visualize_locations.py 位置类别可视化
 visualize_classification.py 分类结果可视化
 analyze_spatial_confusion.py 空间混淆分析
@@ -126,7 +125,6 @@ analyze_spatial_confusion.py 空间混淆分析
 - visualize_locations.py: 可视化室内定位的位置类别分布
 - visualize_classification.py: 分析分类结果，生成混淆矩阵和准确率热图
 - analyze_spatial_confusion.py: 分析位置误差与物理距离的关系
-- ambiguous_location.py: 使用相关性分析识别容易混淆的位置对
 
 ## 详细使用说明
 

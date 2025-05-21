@@ -107,7 +107,7 @@ def create_location_grid(data_dir):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Visualize location classes for WiFi CSI indoor positioning")
-    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset_test", help="Directory containing CSI data")
+    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset", help="Directory containing CSI data")
     args = parser.parse_args()
     
     create_location_grid(args.data_dir)

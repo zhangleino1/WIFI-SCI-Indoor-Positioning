@@ -3,8 +3,7 @@ from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import glob
 import os
-from CSIKit.reader import get_reader
-from CSIKit.util import csitools
+
 from util import min_max_normalization, median_filter
 import re
 import torch

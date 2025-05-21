@@ -25,6 +25,7 @@ conda install lightning -c conda-forge
 pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
 pip install scikit-learn matplotlib seaborn pandas
+pip install csikit
 ```
 
 ### 检查CUDA是否可用
@@ -132,10 +133,6 @@ python analyze_spatial_confusion.py --model_path ./logs/cnn_lstm/version_0/check
 python visualize_locations.py --data_dir ./dataset
 ```
 
-### 位置模糊度分析
-```powershell
-python ambiguous_location.py
-```
 
 ## 常见问题解答
 

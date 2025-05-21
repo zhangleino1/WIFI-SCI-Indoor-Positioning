@@ -75,7 +75,7 @@ class CNN_LSTM_Net(pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         acc = (preds == targets).float().mean()
         
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('train_acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
@@ -88,7 +88,7 @@ class CNN_LSTM_Net(pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         acc = (preds == targets).float().mean()
         
-        self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.log('val_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('val_acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
@@ -101,7 +101,7 @@ class CNN_LSTM_Net(pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         acc = (preds == targets).float().mean()
         
-        self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.log('test_acc', acc, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         
         # 保存预测和目标，用于计算混淆矩阵

@@ -79,56 +79,72 @@ csi.pdf 仔细看在项目中
 csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv
 
 [全量csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
-
 [全量dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
 
-注意：dataset目录只是少量数据集用于测试，不少完整的。
+注意：`dataset`目录中提供了少量数据集用于快速测试和演示，并非完整数据集。
 
 # 文件说明
-本项目基于 pytorch lightning 
+本项目基于 PyTorch Lightning 构建，主要文件包括：
 ```
-main.py  训练，预测入口
-data_process.py  dat文件转成csv 方便快读读取
-util.py  规范化，中值滤波
-heatmappic.py 热力图生成
-csi_dataset.py 数据集
-cnn_net_model.py cnn 模型
-cnn_lstm_net_model.py cnn+lstm模型
-csi.pdf 复现的论文
-visualize_locations.py 位置类别可视化
-visualize_classification.py 分类结果可视化
-analyze_spatial_confusion.py 空间混淆分析
+main.py                     # 训练、测试和预测的统一入口脚本
+csi_dataset.py              # PyTorch Dataset 和 DataLoader 实现，负责数据加载和预处理
+cnn_net_model.py            # 纯 CNN 模型架构
+cnn_lstm_net_model.py       # CNN + LSTM 混合模型架构
+cnn_transformer_model.py    # CNN + Transformer 混合模型架构
+util.py                     # 数据预处理工具函数 (如归一化、中值滤波)
+data_process.py             # (可选) 原始 .dat 文件到 .csv 文件的转换脚本
+heatmappic.py               # (可选) CSI 数据热力图生成，用于数据质量初步检查
+visualize_locations.py      # 可视化数据集中位置点的分布
+visualize_classification.py # 可视化模型分类结果 (混淆矩阵、准确率热图)
+analyze_spatial_confusion.py # 分析模型预测错误与物理空间距离的关系
+USAGE_GUIDE.md              # 详细的用户使用指南
+readme.md                   # 本项目概览文件 (您正在阅读的文件)
+csi.pdf                     # (参考) 项目可能复现或参考的相关论文
 ```
 
 # Python 实现说明
 
-## 数据集处理 (csi_dataset.py)
-- 采用 PyTorch 的 Dataset 和 DataLoader 机制处理 CSI 数据
-- 使用 OrderedDict 实现了高效的数据缓存机制，提高训练速度
-- 将 (x,y) 坐标作为位置类别，实现了从回归任务到分类任务的转换
-- 自动提取数据集中所有唯一位置并创建位置到类别索引的映射
+## 数据集处理 (`csi_dataset.py`)
+- 采用 PyTorch 的 `Dataset` 和 `DataLoader` 机制高效处理CSI数据。
+- 输入数据为 **6通道**，由3个天线的幅度和相位数据构成 (`3 antennas * (1 amplitude + 1 phase) = 6 channels`)。
+- 使用 `OrderedDict` 实现数据缓存机制，加速重复数据块的加载，提高训练效率。
+- 将室内定位问题从坐标回归转换为**分类问题**，每个唯一的 `(x,y)` 坐标被视为一个独立的类别。
+- 自动扫描数据集目录，提取所有唯一位置点，并创建位置到类别索引 (`location_to_class`) 和类别索引到位置 (`class_to_location`) 的映射。
 
-## 网络模型 (cnn_net_model.py, cnn_lstm_net_model.py,cnn_transformer_model.py)
-- 使用 PyTorch Lightning 框架实现了高级模型接口
-- CNN 模型：使用三层卷积提取 CSI 数据的空间特征
-- CNN_LSTM 模型：在卷积网络基础上增加 LSTM 层，同时捕获时间和空间特征
-- CNN_Transformer 模型：结合卷积和 Transformer 结构，进一步提高模型性能
-- 实现了从回归输出到分类输出的转换，使用 CrossEntropyLoss 代替 MSELoss
-- 添加了准确率监控和混淆矩阵可视化功能
+## 网络模型
+本项目提供了三种基于 PyTorch Lightning 实现的深度学习模型：
 
-## 训练与评估 (main.py)
-- 支持 GPU 加速训练
-- 实现了早停、学习率调整等高级训练策略
-- 提供命令行参数支持不同的模型配置
+### 1. CNN 模型 (`cnn_net_model.py`)
+-   **架构**: 纯卷积神经网络。包含三层2D卷积层 (`nn.Conv2d`)，主要用于提取CSI数据中的空间特征。
+-   **特点**: 结构相对简单，训练速度快，适合作为基线模型或在计算资源受限时使用。
+
+### 2. CNN + LSTM 模型 (`cnn_lstm_net_model.py`)
+-   **架构**: 结合了CNN和长短期记忆网络 (LSTM)。首先通过CNN提取空间特征，然后将这些特征序列输入到LSTM层 (`nn.LSTM`) 以捕捉数据的时间依赖性。
+-   **特点**: 能够同时学习CSI数据的空间和时间特性，通常在处理具有时序性的CSI数据时表现更优，是本项目推荐尝试的主力模型之一。
+
+### 3. CNN + Transformer 模型 (`cnn_transformer_model.py`)
+-   **架构**: 结合了CNN和Transformer编码器。通过CNN进行初步特征提取和降维，然后将输出序列输入Transformer编码器 (`nn.TransformerEncoder`)，利用其自注意力机制学习序列内的复杂关系。
+-   **特点**: Transformer具有强大的序列建模能力，可能在捕捉CSI数据中更长距离或更复杂的依赖关系方面有优势。对超参数和数据量可能更敏感。
+
+所有模型均：
+- 使用 `CrossEntropyLoss` 作为损失函数，适应分类任务。
+- 在训练、验证和测试阶段监控准确率。
+- 支持生成混淆矩阵以进行详细的性能分析。
+
+## 训练与评估 (`main.py`)
+- 基于 PyTorch Lightning 实现，简化了训练循环、GPU使用、日志记录等。
+- 支持通过命令行参数配置模型类型、学习率、批大小、训练周期等。
+- 集成了早停 (EarlyStopping) 和学习率调度 (ReduceLROnPlateau) 等高级训练策略。
+- 自动保存最佳模型检查点和最后一个检查点。
 
 ## 数据可视化
-- visualize_locations.py: 可视化室内定位的位置类别分布
-- visualize_classification.py: 分析分类结果，生成混淆矩阵和准确率热图
-- analyze_spatial_confusion.py: 分析位置误差与物理距离的关系
+- `visualize_locations.py`: 可视化数据集中所有位置点的空间分布。
+- `visualize_classification.py`: 加载已训练模型，评估其在测试集上的表现，并生成混淆矩阵和分类准确率热图。
+- `analyze_spatial_confusion.py`: 分析模型预测错误的位置与真实位置之间的物理距离，帮助理解模型的混淆模式。
 
 ## 详细使用说明
 
-详细的[使用指南](./USAGE_GUIDE.md)，包含环境配置、数据处理、模型训练和结果分析等详细说明
+有关环境配置、数据准备、模型训练、参数调整和结果分析的完整详细步骤，请参阅 **[详细使用指南 (USAGE_GUIDE.md)](./USAGE_GUIDE.md)**。
 
 # Email
 zhangleilikejay@gmail.com
@@ -137,15 +153,15 @@ zhangleilikejay@gmail.com
 
 ## 环境要求
 - Python 3.8+
-- PyTorch 1.12+
-- PyTorch Lightning 1.6+
-- 建议在 CUDA 环境下训练以提高速度
+- PyTorch (推荐1.12+ 或更高版本，支持CUDA)
+- PyTorch Lightning (推荐1.6+ 或更高版本)
+- 详细依赖请参见 `USAGE_GUIDE.md` 中的环境配置部分。
 
 ## 数据格式
-- 数据文件命名格式: `antenna_<天线号>_<x坐标>_<y坐标>.csv`
-- 每个 CSV 文件包含幅度和相位数据
-- 幅度列名格式: `amplitude_0`, `amplitude_1`, ...
-- 相位列名格式: `phase_0`, `phase_1`, ...
+- 输入数据为CSV文件，命名格式: `antenna_<天线号>_<x坐标>_<y坐标>.csv`。
+- 每个CSV文件包含多行CSI样本，每行代表一个时间点的测量。
+- 列包含幅度和相位数据，例如: `amplitude_0`, ..., `amplitude_N-1`, `phase_0`, ..., `phase_N-1`。
+- 详细说明请参见 `USAGE_GUIDE.md`。
 
 ## 分类实现关键点
 1. **类别映射**: 将每个唯一的 (x,y) 坐标作为一个分类类别
@@ -170,23 +186,18 @@ zhangleilikejay@gmail.com
    ```
 
 ## 可视化分析方法
-- **混淆矩阵分析**: 识别易混淆的位置类别
-- **位置准确率热图**: 直观展示哪些区域定位更准确
-- **物理距离误差分析**: 分析分类错误与物理距离的关系
+- **混淆矩阵分析**: 识别模型在哪些位置类别之间容易产生混淆。
+- **位置准确率热图**: 直观展示模型在不同物理位置上的预测准确率。
+- **物理距离误差分析**: 分析错误分类的样本与其真实位置和预测位置之间的物理（欧几里得）距离。
 
 # 报错 注意安装
+```powershell
+# 强烈建议参照 USAGE_GUIDE.md 中的详细环境配置步骤进行安装
+# 关键依赖:
+# conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia (根据您的CUDA版本调整)
+# conda install lightning -c conda-forge
+# pip install scikit-learn matplotlib seaborn pandas tensorboard
 ```
-conda install lightning -c conda-forge
-pip install -U 'tensorboardX'
-pip install -U 'tensorboard'
-# 可能还需要安装的依赖
-pip install scikit-learn matplotlib seaborn
-pip install csikit
-```
-
-
-
-
 
 # 可能的未来优化方向
 - 实现基于注意力机制的深度学习模型，进一步提高定位精度

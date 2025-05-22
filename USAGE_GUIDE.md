@@ -82,7 +82,7 @@ python main.py --model_type cnn_lstm --data_dir ./dataset --mode train
 其中包含 `last.ckpt` (最后一个检查点) 和最佳性能的检查点。这些检查点可以通过 `--cpt_path` 参数加载进行测试或继续训练。
 
 ### 常用参数说明
-- `--model_type`: 选择模型类型，可选 'cnn' 或 'cnn_lstm'
+- `--model_type`: 选择模型类型，可选 'cnn' 或 'cnn_lstm' 或 'cnn_transformer'，默认为 'cnn_lstm'
 - `--data_dir`: 数据集目录
 - `--batch_size`: 批大小，默认为128
 - `--lr`: 学习率，默认为0.0001

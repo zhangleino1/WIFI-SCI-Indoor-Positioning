@@ -108,10 +108,11 @@ analyze_spatial_confusion.py 空间混淆分析
 - 将 (x,y) 坐标作为位置类别，实现了从回归任务到分类任务的转换
 - 自动提取数据集中所有唯一位置并创建位置到类别索引的映射
 
-## 网络模型 (cnn_net_model.py, cnn_lstm_net_model.py)
+## 网络模型 (cnn_net_model.py, cnn_lstm_net_model.py,cnn_transformer_model.py)
 - 使用 PyTorch Lightning 框架实现了高级模型接口
 - CNN 模型：使用三层卷积提取 CSI 数据的空间特征
 - CNN_LSTM 模型：在卷积网络基础上增加 LSTM 层，同时捕获时间和空间特征
+- CNN_Transformer 模型：结合卷积和 Transformer 结构，进一步提高模型性能
 - 实现了从回归输出到分类输出的转换，使用 CrossEntropyLoss 代替 MSELoss
 - 添加了准确率监控和混淆矩阵可视化功能
 
@@ -180,6 +181,7 @@ pip install -U 'tensorboardX'
 pip install -U 'tensorboard'
 # 可能还需要安装的依赖
 pip install scikit-learn matplotlib seaborn
+pip install csikit
 ```
 
 

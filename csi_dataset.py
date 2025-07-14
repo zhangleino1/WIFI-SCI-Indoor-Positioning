@@ -9,15 +9,13 @@ import re
 import torch
 from sklearn.model_selection import train_test_split
 import pandas as pd
-from collections import OrderedDict
 
 class CSIDataset(Dataset):
-    def __init__(self, directory, time_step, stride=1, cache_size=270):
+    def __init__(self, directory, time_step, stride=1):
         self.directory = directory
         self.time_step = time_step
         self.stride = stride
-        self.cache = OrderedDict()
-        self.cache_size = cache_size
+        self.data_cache = {}  # Store all loaded data
         
         # Extract all unique location classes (x,y coordinates)
         # Scan directory for all files to find unique locations
@@ -42,105 +40,94 @@ class CSIDataset(Dataset):
         
         print(f"Found {self.num_classes} unique location classes: {sorted(self.location_classes)}")
         
+        # Load all CSV files into memory
+        self._load_all_data()
+        
         self._prepare_index_map() # This will populate self.sample_info_list and self.total_samples
+
+    def _load_all_data(self):
+        """Load all CSV files into memory"""
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        
+        for location in self.location_to_class.keys():
+            x, y = location
+            file_paths = [
+                os.path.join(self.directory, f'antenna_1_{x}_{y}.csv'),
+                os.path.join(self.directory, f'antenna_2_{x}_{y}.csv'),
+                os.path.join(self.directory, f'antenna_3_{x}_{y}.csv')
+            ]
+            
+            # Check if all files exist
+            if all(os.path.exists(fp) for fp in file_paths):
+                location_data = []
+                for file_path in file_paths:
+                    print(f"Loading {file_path}")
+                    df = pd.read_csv(file_path, na_values='#NAME?')
+                    amplitude_data = df.filter(regex='^amplitude_').values.astype(np.float32)
+                    phase_data = df.filter(regex='^phase_').values.astype(np.float32)
+                    
+                    if amplitude_data.shape[0] == 0 or phase_data.shape[0] == 0:
+                        raise ValueError(f"Empty data after filtering in file: {file_path}")
+
+                    # amplitude_data = min_max_normalization(median_filter(amplitude_data))
+                    # phase_data = min_max_normalization(median_filter(phase_data))
+                    
+                    amplitude_tensor = torch.tensor(amplitude_data, dtype=torch.float32).to(device)
+                    phase_tensor = torch.tensor(phase_data, dtype=torch.float32).to(device)
+                    
+                    location_data.append((amplitude_tensor, phase_tensor))
+                
+                self.data_cache[location] = location_data
+            else:
+                print(f"Warning: Missing one or more antenna files for location {location}. Skipping this location.")
 
     def _prepare_index_map(self):
         self.sample_info_list = []
-        for location in self.location_to_class.keys():
-            x, y = location
-            file_path_ant1 = os.path.join(self.directory, f'antenna_1_{x}_{y}.csv')
-            file_path_ant2 = os.path.join(self.directory, f'antenna_2_{x}_{y}.csv')
-            file_path_ant3 = os.path.join(self.directory, f'antenna_3_{x}_{y}.csv')
+        for location in self.data_cache.keys():
+            # Get the number of rows from the first antenna's amplitude data
+            num_rows = self.data_cache[location][0][0].shape[0]  # amplitude_tensor shape[0]
+            
+            if num_rows < self.time_step:
+                print(f"Warning: Not enough data for location {location} for time_step {self.time_step}. Has {num_rows} rows. Skipping location {location}.")
+                continue
 
-            if os.path.exists(file_path_ant1) and \
-               os.path.exists(file_path_ant2) and \
-               os.path.exists(file_path_ant3):
+            num_segments = (num_rows - self.time_step + 1) // self.stride
+            if num_segments <= 0:
+                print(f"Warning: No segments generated for location {location} with {num_rows} rows, time_step {self.time_step}, stride {self.stride}. Skipping location {location}.")
+                continue
                 
-                try:
-                    # Efficiently get row count from the first antenna's CSV
-                    # Assuming all antenna files for the same location have the same number of rows
-                    num_rows = pd.read_csv(file_path_ant1, usecols=[0]).shape[0]
-                except pd.errors.EmptyDataError:
-                    print(f"Warning: Empty CSV file encountered: {file_path_ant1}. Skipping location {location}.")
-                    continue
-                except Exception as e:
-                    print(f"Warning: Error reading {file_path_ant1}: {e}. Skipping location {location}.")
-                    continue
-                
-                if num_rows < self.time_step:
-                    print(f"Warning: Not enough data in {file_path_ant1} for time_step {self.time_step}. Has {num_rows} rows. Skipping location {location}.")
-                    continue
-
-                num_segments = (num_rows - self.time_step + 1) // self.stride
-                if num_segments <= 0:
-                    print(f"Warning: No segments generated for {file_path_ant1} with {num_rows} rows, time_step {self.time_step}, stride {self.stride}. Skipping location {location}.")
-                    continue
-                    
-                for segment_idx in range(num_segments):
-                    self.sample_info_list.append(
-                        (file_path_ant1, file_path_ant2, file_path_ant3, segment_idx, location)
-                    )
-            else:
-                print(f"Warning: Missing one or more antenna files for location {location}. Skipping this location.")
+            for segment_idx in range(num_segments):
+                self.sample_info_list.append((location, segment_idx))
         
         self.total_samples = len(self.sample_info_list)
         if self.total_samples == 0:
             raise ValueError("No valid samples found. Check data directory, file naming, and time_step/stride parameters.")
         print(f"Prepared {self.total_samples} total samples.")
 
-    def _load_csv(self, file_path):
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        key = file_path
-        if key in self.cache:
-            # print(f"Cache hit for {file_path}") # Reduce verbosity
-            self.cache.move_to_end(key)
-            return self.cache[key]
-        else:
-            # print(f"Loading and processing {file_path}") # Reduce verbosity
-            df = pd.read_csv(file_path, na_values='#NAME?')
-            amplitude_data = df.filter(regex='^amplitude_').values.astype(np.float32)
-            phase_data = df.filter(regex='^phase_').values.astype(np.float32)
-            
-            if amplitude_data.shape[0] == 0 or phase_data.shape[0] == 0:
-                raise ValueError(f"Empty data after filtering in file: {file_path}")
-
-            amplitude_data = min_max_normalization(median_filter(amplitude_data))
-            phase_data = min_max_normalization(median_filter(phase_data))
-            
-            amplitude_tensor = torch.tensor(amplitude_data, dtype=torch.float32).to(device)
-            phase_tensor = torch.tensor(phase_data, dtype=torch.float32).to(device)
-            
-            self.cache[key] = (amplitude_tensor, phase_tensor)
-            if len(self.cache) > self.cache_size:
-                self.cache.popitem(last=False)
-            return self.cache[key]
-
     def __len__(self):
         return self.total_samples
 
     def __getitem__(self, idx):
-        file_path_ant1, file_path_ant2, file_path_ant3, segment_idx, location = self.sample_info_list[idx]
-
-        amplitude_tensor_ant1, phase_tensor_ant1 = self._load_csv(file_path_ant1)
-        amplitude_tensor_ant2, phase_tensor_ant2 = self._load_csv(file_path_ant2)
-        amplitude_tensor_ant3, phase_tensor_ant3 = self._load_csv(file_path_ant3)
-
+        location, segment_idx = self.sample_info_list[idx]
+        
+        # Get pre-loaded data
+        location_data = self.data_cache[location]
+        
         start_idx = segment_idx * self.stride
         end_idx = start_idx + self.time_step
 
-        all_channels_data = [
-            amplitude_tensor_ant1[start_idx:end_idx, :],
-            phase_tensor_ant1[start_idx:end_idx, :],
-            amplitude_tensor_ant2[start_idx:end_idx, :],
-            phase_tensor_ant2[start_idx:end_idx, :],
-            amplitude_tensor_ant3[start_idx:end_idx, :],
-            phase_tensor_ant3[start_idx:end_idx, :]
-        ]
+        print(f"CSIDataset: Getting item {idx} for location {location}, segment_idx {segment_idx}, start_idx {start_idx}, end_idx {end_idx}")
+
+        all_channels_data = []
+        for antenna_idx in range(3):
+            amplitude_tensor, phase_tensor = location_data[antenna_idx]
+            all_channels_data.append(amplitude_tensor[start_idx:end_idx, :])
+            all_channels_data.append(phase_tensor[start_idx:end_idx, :])
         
         # Ensure all segments have the expected time_step length
         for i, segment in enumerate(all_channels_data):
             if segment.shape[0] != self.time_step:
-                raise ValueError(f"Segment {i} for sample {idx} (loc {location}, seg_idx {segment_idx}) has incorrect time_step {segment.shape[0]}, expected {self.time_step}. File {self.sample_info_list[idx][i//2]}. Start {start_idx}, End {end_idx}")
+                raise ValueError(f"Segment {i} for sample {idx} (loc {location}, seg_idx {segment_idx}) has incorrect time_step {segment.shape[0]}, expected {self.time_step}. Start {start_idx}, End {end_idx}")
 
         sample_data = torch.stack(all_channels_data) # Shape: (6, time_step, num_subcarriers)
         
@@ -172,8 +159,8 @@ class CSIDataModule(pl.LightningDataModule):
             class_counts = {i: 0 for i in range(self.num_classes)}
             
             for sample_info in self.dataset.sample_info_list:
-                # sample_info is (file_path_ant1, file_path_ant2, file_path_ant3, segment_idx, location)
-                location = sample_info[4] 
+                # sample_info is (location, segment_idx)
+                location = sample_info[0] 
                 class_idx = self.dataset.location_to_class[location]
                 class_counts[class_idx] += 1
             
@@ -199,6 +186,7 @@ class CSIDataModule(pl.LightningDataModule):
         self.train_dataset = torch.utils.data.Subset(self.dataset, self.train_idx)
         self.val_dataset = torch.utils.data.Subset(self.dataset, self.val_idx)
         self.test_dataset = torch.utils.data.Subset(self.dataset, self.test_idx)
+
 
     def train_dataloader(self):
         return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True,persistent_workers=True)

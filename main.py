@@ -37,7 +37,7 @@ def get_callbacks(args):
 def train(args):
     # 设置数据模块
     data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,
-                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stripe)
+                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stride)
 
     # 设置模型 - 传递分类数量
     model = get_model(args, data_module.num_classes)
@@ -88,7 +88,7 @@ def get_model(args, num_classes):
 def test(args):
     # 首先创建数据模块以获取类别数量
     data_module = CSIDataModule(batch_size=args.batch_size, num_workers=args.num_workers,
-                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stripe)
+                                time_step=args.time_step, data_dir=args.data_dir, stride=args.stride)
     
     logger = TensorBoardLogger(
             save_dir="./logs",
@@ -177,9 +177,9 @@ def test(args):
     
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Train a neural network on WiFi CSI data")
-    parser.add_argument("--batch_size", type=int, default=128, help="Input batch size for training")
+    parser.add_argument("--batch_size", type=int, default=64, help="Input batch size for training")
     parser.add_argument("--num_workers", type=int, default=8, help="Number of workers for data loading")
-    parser.add_argument("--lr", type=float, default=0.0001, help="Initial learning rate")
+    parser.add_argument("--lr", type=float, default=0.001, help="Initial learning rate")
     parser.add_argument("--lr_factor", type=float, default=0.1, help="Factor by which the learning rate will be reduced")
     parser.add_argument("--lr_patience", type=int, default=10, help="Number of epochs with no improvement after which learning rate will be reduced")
     parser.add_argument("--lr_eps", type=float, default=1e-6, help="Epsilon for learning rate reduction")
@@ -189,13 +189,13 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs', default=120, type=int)
     parser.add_argument('--min_steps', type=int, default=5)
     parser.add_argument('--fast_dev_run', default=False, type=bool)
-    parser.add_argument('--stripe', type=int, default=1)
+    parser.add_argument('--stride', type=int, default=2, help="Stride for sliding window")
     parser.add_argument('--accelerator', default="gpu", type=str)
     parser.add_argument('--devices', default=1, type=int)
     parser.add_argument('--mode', choices=['test','train'], type=str,default='train')
     parser.add_argument('--model_type', type=str, default='cnn', choices=['cnn', 'cnn_lstm', 'cnn_transformer'], # Added 'cnn_transformer'
                         help='Model type to train/test')
-    parser.add_argument('--cpt_path', default=os.getcwd() + '/logs/cnn_transformer/version_0/checkpoints/cnn_transformer-best-epoch=106-val_loss=1.180.ckpt', type=str)
+    parser.add_argument('--cpt_path', default=os.getcwd() + '/logs/cnn/version_0/checkpoints/cnn-best-epoch=00-val_loss=4.558.ckpt', type=str)
 
     
     args = parser.parse_args()

@@ -17,7 +17,7 @@ matplotlib.rcParams['font.family']='sans-serif'
 matplotlib.rcParams['axes.unicode_minus'] = False 
 
 # 指定数据集目录
-directory = os.getcwd()+'/dataset_test'  # 更改为实际路径
+directory = os.getcwd()+'/dataset'  # 更改为实际路径
 
 
 

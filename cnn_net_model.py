@@ -34,11 +34,13 @@ class CNN_Net(pl.LightningModule):
         # Conv layers with kernel_size=5, padding=2 maintain HxW dimensions
         conv_output_size = 18 * self.hparams.time_step * self.hparams.num_subcarriers
         
-        self.fc1 = nn.Linear(conv_output_size, 9000)
-        self.bn4 = nn.BatchNorm1d(num_features=9000)
-        self.fc2 = nn.Linear(9000, 900)
-        self.bn5 = nn.BatchNorm1d(num_features=900)
-        self.fc3 = nn.Linear(900, self.hparams.num_classes)
+        self.fc1 = nn.Linear(conv_output_size, 1024)
+        self.bn4 = nn.BatchNorm1d(num_features=1024)
+        self.dropout1 = nn.Dropout(0.5)
+        self.fc2 = nn.Linear(1024, 512)
+        self.bn5 = nn.BatchNorm1d(num_features=512)
+        self.dropout2 = nn.Dropout(0.3)
+        self.fc3 = nn.Linear(512, self.hparams.num_classes)
 
     def forward(self, x):
         if not self.printed_input_shape and x.ndim == 4:
@@ -50,7 +52,9 @@ class CNN_Net(pl.LightningModule):
         x = F.relu(self.bn3(self.conv3(x)))
         x = x.view(x.size(0), -1) # Flatten
         x = F.relu(self.bn4(self.fc1(x)))
+        x = self.dropout1(x)
         x = F.relu(self.bn5(self.fc2(x)))
+        x = self.dropout2(x)
         x = self.fc3(x)
         return x
 
@@ -79,8 +83,8 @@ class CNN_Net(pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         acc = (preds == targets).float().mean()
         
-        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
-        self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
+        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('train_acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -91,9 +95,9 @@ class CNN_Net(pl.LightningModule):
         preds = torch.argmax(logits, dim=1)
         acc = (preds == targets).float().mean()
         
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
-        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
-        return loss # Return loss for ReduceLROnPlateau
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        self.log('val_acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+        return loss
 
     def test_step(self, batch, batch_idx):
         data, targets = batch
@@ -104,7 +108,7 @@ class CNN_Net(pl.LightningModule):
         acc = (preds == targets).float().mean()
         
         self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
-        self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
+        # self.log('test_acc', acc, on_step=False, on_epoch=True, prog_bar=True, logger=True) # on_step=False
         
         # 保存预测和目标，用于计算混淆矩阵
         self.test_preds.extend(preds.cpu().numpy())

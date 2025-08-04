@@ -69,8 +69,8 @@ class CSIDataset(Dataset):
                     if amplitude_data.shape[0] == 0 or phase_data.shape[0] == 0:
                         raise ValueError(f"Empty data after filtering in file: {file_path}")
 
-                    # amplitude_data = min_max_normalization(median_filter(amplitude_data))
-                    # phase_data = min_max_normalization(median_filter(phase_data))
+                    amplitude_data = min_max_normalization(median_filter(amplitude_data))
+                    phase_data = min_max_normalization(median_filter(phase_data))
                     
                     amplitude_tensor = torch.tensor(amplitude_data, dtype=torch.float32).to(device)
                     phase_tensor = torch.tensor(phase_data, dtype=torch.float32).to(device)
@@ -116,7 +116,7 @@ class CSIDataset(Dataset):
         start_idx = segment_idx * self.stride
         end_idx = start_idx + self.time_step
 
-        print(f"CSIDataset: Getting item {idx} for location {location}, segment_idx {segment_idx}, start_idx {start_idx}, end_idx {end_idx}")
+        # print(f"CSIDataset: Getting item {idx} for location {location}, segment_idx {segment_idx}, start_idx {start_idx}, end_idx {end_idx}")
 
         all_channels_data = []
         for antenna_idx in range(3):
@@ -135,6 +135,7 @@ class CSIDataset(Dataset):
         
         if idx == 0:
             print(f"CSIDataset: sample_data shape: {sample_data.shape}, class_idx: {class_idx}")
+            print(f"CSIDataset: sample_data range - min: {sample_data.min():.4f}, max: {sample_data.max():.4f}")
             # Example: CSIDataset: sample_data shape: torch.Size([6, 15, 30]), class_idx: 0
             # This means 6 channels, 15 time steps (height), 30 subcarriers (width)
 
@@ -189,10 +190,10 @@ class CSIDataModule(pl.LightningDataModule):
 
 
     def train_dataloader(self):
-        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True,persistent_workers=True)
+        return DataLoader(self.train_dataset, batch_size=self.batch_size, num_workers=self.num_workers, shuffle=True, persistent_workers=self.num_workers > 0)
 
     def val_dataloader(self):
-        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers,persistent_workers=True)
+        return DataLoader(self.val_dataset, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=self.num_workers > 0)
 
     def test_dataloader(self):
-        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers,persistent_workers=True)
+        return DataLoader(self.test_dataset, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=self.num_workers > 0)

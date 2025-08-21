@@ -162,6 +162,8 @@ zhangleilikejay@gmail.com
 - 每个CSV文件包含多行CSI样本，每行代表一个时间点的测量。
 - 列包含幅度和相位数据，例如: `amplitude_0`, ..., `amplitude_N-1`, `phase_0`, ..., `phase_N-1`。
 - 详细说明请参见 `USAGE_GUIDE.md`。
+## 指纹地图
+![地图]([https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/wechat_2025-08-21_093130_935.png))
 
 ## 分类实现关键点
 1. **类别映射**: 将每个唯一的 (x,y) 坐标作为一个分类类别

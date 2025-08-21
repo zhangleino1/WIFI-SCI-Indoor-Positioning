@@ -164,7 +164,7 @@ zhangleilikejay@gmail.com
 - 详细说明请参见 `USAGE_GUIDE.md`。
 ## 指纹地图
 
-![map](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/wechat_2025-08-21_093130_935.png)
+![map](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/wechat_2025-08-21_093130_935.png?raw=true)
 
 ## 分类实现关键点
 1. **类别映射**: 将每个唯一的 (x,y) 坐标作为一个分类类别

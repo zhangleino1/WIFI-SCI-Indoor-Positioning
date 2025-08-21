@@ -34,7 +34,7 @@ csi.pdf 仔细看在项目中
 
 喝杯咖啡，感谢开源，祝您毕业！
 
-![dashang](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/dashang.png)
+![dashang](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/dashang.png)
 
 ![公众号](https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png)
 
@@ -74,15 +74,15 @@ pip install -U 'tensorboard'
 
 # csi data image filter
 
-![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/1.png)
-![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/2.png)
-![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/3.png)
-![4](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/4.png)
+![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/1.png)
+![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/2.png)
+![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/3.png)
+![4](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/4.png)
 
 # research images
-![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/Figure_1.png)
-![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/cnn_cdf.png)
-![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/微信图片_20240718185423.png)
+![1](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/Figure_1.png)
+![2](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/cnn_cdf.png)
+![3](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/regression/微信图片_20240718185423.png)
 ![4](https://cdn.nlark.com/yuque/0/2024/png/354158/1721299909950-46a16f6b-cbd8-40fb-9833-35be7e0d0c5c.png?x-oss-process=image%2Fformat%2Cwebp%2Fresize%2Cw_1303%2Climit_0)
 
 

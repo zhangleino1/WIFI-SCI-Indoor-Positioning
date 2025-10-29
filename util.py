@@ -1,4 +1,5 @@
 
+# 作者：程序员石磊，盗用卖钱可耻，在github即可搜到
 from scipy.signal import medfilt
 from sklearn.preprocessing import MinMaxScaler
 import numpy as np

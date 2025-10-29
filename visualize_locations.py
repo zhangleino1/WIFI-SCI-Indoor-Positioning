@@ -1,3 +1,4 @@
+# 作者：程序员石磊，盗用卖钱可耻，在github即可搜到
 import os
 import glob
 import re

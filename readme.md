@@ -73,7 +73,10 @@ csi.pdf 仔细看在项目中
 
 ![dashang](https://github.com/zhangleino1/WIFI-SCI-Indoor-Positioning/blob/main/images/dashang.png)
 
-![公众号](https://img-blog.csdnimg.cn/9996d8ee490a402aaa7243ba84aef175.png)
+
+![程序员石磊](https://github.com/zhangleino1/Indoor-Map-Designer/blob/main/%E6%89%AB%E7%A0%81_%E6%90%9C%E7%B4%A2%E8%81%94%E5%90%88%E4%BC%A0%E6%92%AD%E6%A0%B7%E5%BC%8F-%E6%A0%87%E5%87%86%E8%89%B2%E7%89%88.png)
+
+
 
 # 数据集
 csv 文件 格式说明antenna_1_2_6.csv  antenna_天线号_坐标x_坐标y.csv

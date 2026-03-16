@@ -162,15 +162,15 @@ python main.py --model_type cnn_lstm --data_dir ./dataset --mode train --task re
 这些检查点可以通过 `--cpt_path` 参数加载，用于继续训练或进行测试评估。
 
 ### 常用参数说明
--   `--model_type`: (字符串) 选择模型架构。可选: `'cnn'`, `'cnn_lstm'`, `'cnn_transformer'`。默认为 `'cnn_lstm'`。
+-   `--model_type`: (字符串) 选择模型架构。可选: `'cnn'`, `'cnn_lstm'`, `'cnn_transformer'`。默认为 `'cnn'`。
 -   `--data_dir`: (字符串) 包含CSV格式CSI数据的数据集目录。
--   `--batch_size`: (整数) 训练和评估时的批处理大小。默认为 `128`。
--   `--lr`: (浮点数) 优化器的初始学习率。默认为 `0.0001`。
+-   `--batch_size`: (整数) 训练和评估时的批处理大小。默认为 `64`。
+-   `--lr`: (浮点数) 优化器的初始学习率。默认为 `0.001`。
 -   `--max_epochs`: (整数) 最大训练周期数。默认为 `120`。
--   `--min_epochs`: (整数) 最小训练周期数。默认为 `1`。
+-   `--min_epochs`: (整数) 最小训练周期数。默认为 `10`。
 -   `--time_step`: (整数) 每个CSI样本的时间步长（即用多少个连续的CSI测量来构成一个输入样本）。默认为 `15`。
--   `--stripe` (应为 `--stride`): (整数) 在生成样本时，连续样本之间的滑动步长。默认为 `1`。
--   `--num_workers`: (整数) DataLoader使用的工作进程数。默认为 `4`。
+-   `--stride`: (整数) 在生成样本时，连续样本之间的滑动步长。默认为 `2`。
+-   `--num_workers`: (整数) DataLoader使用的工作进程数。默认为 `8`。
 -   `--fast_dev_run`: (布尔值) 如果为True，则运行一个批次的训练和验证，用于快速调试。默认为 `False`。
 -   `--mode`: (字符串) 运行模式。可选: `'train'`, `'test'`。默认为 `'train'`。
 -   `--task`: (字符串) 任务类型。可选: `'classification'`, `'regression'`。默认为 `'classification'`。

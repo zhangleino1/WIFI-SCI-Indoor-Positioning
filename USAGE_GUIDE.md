@@ -123,15 +123,24 @@ antenna_<天线号>_<x坐标>_<y坐标>.csv
     -   Transformer编码器的输出用于最终分类。
 -   **特点**: 强大的序列建模能力，可能在捕捉CSI数据中更长距离或更复杂的依赖关系方面具有优势。需要仔细调整超参数（如 `d_model`, `nhead`）。
 
-所有模型均将室内定位视为一个**分类问题**，其中每个唯一的 `(x,y)` 坐标对被视为一个独立的类别。
+所有模型同时支持两种任务模式，通过 `--task` 参数切换：
+- **分类模式** (`--task classification`)：将每个唯一的 `(x,y)` 坐标视为独立类别，使用 CrossEntropyLoss，报告准确率。
+- **回归模式** (`--task regression`)：直接预测 `(x,y)` 坐标，使用 SmoothL1Loss，报告平均欧氏距离误差。
 
 ## 模型训练
 
 ### 基础训练命令
-选择并训练特定模型，例如 `CNN_LSTM_Net`:
+
+**分类模式**（将每个位置视为独立类别，报告准确率）：
 ```powershell
-python main.py --model_type cnn_lstm --data_dir ./dataset --mode train
+python main.py --model_type cnn_lstm --data_dir ./dataset --mode train --task classification
 ```
+
+**回归模式**（直接预测坐标，报告平均距离误差，推荐在分类精度低时使用）：
+```powershell
+python main.py --model_type cnn_lstm --data_dir ./dataset --mode train --task regression
+```
+
 将 `--model_type` 替换为 `cnn` 或 `cnn_transformer` 来训练其他模型。
 
 ### 训练与测试模式说明
@@ -164,6 +173,9 @@ python main.py --model_type cnn_lstm --data_dir ./dataset --mode train
 -   `--num_workers`: (整数) DataLoader使用的工作进程数。默认为 `4`。
 -   `--fast_dev_run`: (布尔值) 如果为True，则运行一个批次的训练和验证，用于快速调试。默认为 `False`。
 -   `--mode`: (字符串) 运行模式。可选: `'train'`, `'test'`。默认为 `'train'`。
+-   `--task`: (字符串) 任务类型。可选: `'classification'`, `'regression'`。默认为 `'classification'`。
+    - `classification`: 将每个 (x,y) 位置视为独立类别，使用交叉熵损失，报告准确率和混淆矩阵。
+    - `regression`: 直接预测 (x,y) 坐标，使用 SmoothL1 损失，报告平均欧氏距离误差（单位：网格单元）、中位误差、误差CDF图。**当分类精度较低时推荐使用。**
 -   `--cpt_path`: (字符串) 模型检查点文件的路径。用于从特定检查点继续训练或进行测试。
 
 ### 高级训练选项
@@ -176,11 +188,20 @@ python main.py --model_type cnn_transformer --data_dir ./dataset --batch_size 64
 ## 性能评估
 
 ### 测试已训练模型
-使用 `--mode test` 和 `--cpt_path` 参数测试已训练的模型在测试集上的性能：
+
+**测试分类模型**（报告准确率和混淆矩阵）：
 ```powershell
-python main.py --mode test --model_type cnn_lstm --data_dir ./dataset --cpt_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt
+python main.py --mode test --task classification --model_type cnn_lstm --data_dir ./dataset \
+  --cpt_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt
 ```
-将 `--model_type` 和 `--cpt_path` 替换为您要测试的实际模型和检查点。
+
+**测试回归模型**（报告平均距离误差、CDF 图和散点图，保存到 `results/cnn_lstm_results/`）：
+```powershell
+python main.py --mode test --task regression --model_type cnn_lstm --data_dir ./dataset \
+  --cpt_path ./logs/cnn_lstm/version_0/checkpoints/last.ckpt
+```
+
+**注意**: 测试时的 `--task` 参数必须与训练时一致，否则模型结构不匹配。
 
 ### 测试不同检查点的模型
 您可以通过更改 `--cpt_path` 参数来测试在不同训练阶段保存的模型，例如测试验证集上表现最佳的模型：
@@ -230,13 +251,24 @@ A:
 4.  **减小模型复杂度**: 尝试减少卷积层数、通道数，或减小LSTM/Transformer的隐藏单元数。
 5.  **增加数据量**: 收集更多样化的数据。
 
+### Q: 分类精度为什么很低？
+
+A: 分类精度低有以下几个主要原因：
+
+1. **类别数量过多**: 10×10 网格 = 100 个类别，随机猜测基准仅为 1%。
+2. **损失函数忽略空间距离**: `CrossEntropyLoss` 对所有错误预测一视同仁。将 `(0,0)` 预测为 `(1,0)` 与预测为 `(9,9)` 受到相同惩罚，模型无法感知"距离"的概念。
+3. **每类样本量有限**: 每位置约 400 个样本（时间步 15、步长 2 滑窗后），100 类分类任务数据量不足。
+4. **位置定位本质是连续空间问题**: 分类方法将连续空间强行离散化，丢失了相邻位置 CSI 相似的先验知识。
+
+**解决方案**: 切换到回归模式 `--task regression`，直接预测坐标并用欧氏距离衡量误差。
+
 ### Q: 为什么选择分类而非回归来定位?
-A: 本项目采用的是**指纹定位 (Fingerprinting)** 的思想。
--   **指纹定位**: 将每个预定义的可区分位置点（例如网格点 `(x,y)`）视为一个单独的类别。模型学习将观察到的CSI模式映射到这些预定义的位置类别之一。
--   **优点**:
-    -   可以更好地处理CSI信号的复杂非线性特性。
-    -   对于离散的、定义明确的参考点集合，分类方法通常更直接且易于训练。
--   **与回归对比**: 直接回归坐标 `(x,y)` 也是一种方法，但可能对CSI信号的微小变化更敏感，且损失函数的定义和优化可能更具挑战性。对于指纹库方法，分类是自然的选择。
+A: 本项目同时支持两种模式，各有优劣：
+
+-   **分类模式** (`--task classification`): 将每个位置视为独立类别，适合位置点少（≤30 个）、数据量充足的场景。优点是直观（准确率），缺点是忽略空间关系，类别多时精度下降明显。
+-   **回归模式** (`--task regression`): 直接预测 `(x,y)` 坐标，适合位置点多、需要亚格点精度的场景。优点是利用空间连续性，误差指标直观（平均距离误差）。
+
+**一般建议**: 如果分类精度低于 50%，建议切换到回归模式。
 
 ### Q: 如何改进模型性能?
 A:

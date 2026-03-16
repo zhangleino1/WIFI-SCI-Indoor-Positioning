@@ -12,10 +12,11 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 
 class CSIDataset(Dataset):
-    def __init__(self, directory, time_step, stride=1):
+    def __init__(self, directory, time_step, stride=1, task='classification'):
         self.directory = directory
         self.time_step = time_step
         self.stride = stride
+        self.task = task  # 'classification' or 'regression'
         self.data_cache = {}  # Store all loaded data
         
         # Extract all unique location classes (x,y coordinates)
@@ -132,27 +133,31 @@ class CSIDataset(Dataset):
 
         sample_data = torch.stack(all_channels_data) # Shape: (6, time_step, num_subcarriers)
         
-        class_idx = self.location_to_class[location]
-        
         if idx == 0:
-            print(f"CSIDataset: sample_data shape: {sample_data.shape}, class_idx: {class_idx}")
+            print(f"CSIDataset: sample_data shape: {sample_data.shape}, location: {location}, task: {self.task}")
             print(f"CSIDataset: sample_data range - min: {sample_data.min():.4f}, max: {sample_data.max():.4f}")
-            # Example: CSIDataset: sample_data shape: torch.Size([6, 15, 30]), class_idx: 0
-            # This means 6 channels, 15 time steps (height), 30 subcarriers (width)
 
-        return sample_data, torch.tensor(class_idx, dtype=torch.long, device=sample_data.device)
+        if self.task == 'regression':
+            x_coord, y_coord = location
+            target = torch.tensor([float(x_coord), float(y_coord)], dtype=torch.float32, device=sample_data.device)
+        else:
+            class_idx = self.location_to_class[location]
+            target = torch.tensor(class_idx, dtype=torch.long, device=sample_data.device)
+
+        return sample_data, target
 
 class CSIDataModule(pl.LightningDataModule):
-    def __init__(self, batch_size, num_workers, time_step, data_dir, stride):
+    def __init__(self, batch_size, num_workers, time_step, data_dir, stride, task='classification'):
         super().__init__()
         self.batch_size = batch_size
         self.num_workers = num_workers
         self.time_step = time_step
         self.data_dir = data_dir
         self.stride = stride
+        self.task = task
 
         # 加载全部数据索引
-        self.dataset = CSIDataset(directory=self.data_dir, time_step=self.time_step, stride=self.stride)
+        self.dataset = CSIDataset(directory=self.data_dir, time_step=self.time_step, stride=self.stride, task=self.task)
         self.num_classes = self.dataset.num_classes  # Store number of classes for model initialization
 
         # --- Class Distribution Analysis ---

@@ -27,7 +27,6 @@ class CNN_Net(CSIBaseModel):
         lr_factor: float,
         lr_patience: int,
         lr_eps: float,
-        num_classes: int = 0,          # unused for regression; kept for API compat
         time_step: int = 15,
         num_subcarriers: int = 30,
         reg_loss: str = 'smooth_l1',   # 'smooth_l1' | 'mse' | 'mae'

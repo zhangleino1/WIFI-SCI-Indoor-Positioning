@@ -98,7 +98,13 @@ class CSIBaseModel(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         data, targets = batch
         preds = self(data)
-        loss  = self._step(batch, 'test')
+        loss  = self._reg_loss_fn(preds, targets)
+
+        with torch.no_grad():
+            dist = torch.sqrt(((preds - targets) ** 2).sum(dim=1)).mean()
+
+        self.log('test_loss', loss, on_epoch=True, prog_bar=True, logger=True, on_step=False)
+        self.log('test_dist', dist, on_epoch=True, prog_bar=True, logger=True, on_step=False)
 
         self.test_reg_preds.extend(preds.detach().cpu().numpy())
         self.test_reg_targets.extend(targets.cpu().numpy())

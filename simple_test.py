@@ -1,48 +1,43 @@
 # 作者：程序员石磊，盗用卖钱可耻，在github即可搜到
-import torch
-from cnn_net_model import CNN_Net
 import os
 
-# 检查点路径
-ckpt_path = './logs/cnn/version_0/checkpoints/cnn-best-epoch=00-val_loss=4.558.ckpt'
+import torch
 
-print("=== 测试模型检查点 ===")
-print(f"检查点路径: {ckpt_path}")
-print(f"检查点存在: {os.path.exists(ckpt_path)}")
+from cnn_net_model import CNN_Net
+
+
+ckpt_path = './logs/cnn/version_0/checkpoints/last.ckpt'
+
+print('=== 回归模型检查点测试 ===')
+print(f'检查点路径: {ckpt_path}')
+print(f'检查点存在: {os.path.exists(ckpt_path)}')
 
 if os.path.exists(ckpt_path):
-    # 加载检查点信息
     checkpoint = torch.load(ckpt_path, map_location='cpu')
     hparams = checkpoint['hyper_parameters']
-    print(f"模型类别数: {hparams['num_classes']}")
-    print(f"时间步长: {hparams['time_step']}")
-    
-    # 加载模型
+    print(f"时间步长: {hparams.get('time_step')}")
+    print(f"子载波数: {hparams.get('num_subcarriers')}")
+    print(f"回归损失: {hparams.get('reg_loss')}")
+
     model = CNN_Net.load_from_checkpoint(ckpt_path, map_location='cpu')
     model.eval()
-    print("模型加载成功")
-    
-    # 创建测试数据
-    test_data = torch.randn(16, 6, 15, 30)
-    print(f"测试数据形状: {test_data.shape}")
-    
-    # 前向传播
+    print('模型加载成功')
+
+    time_step = hparams.get('time_step', 15)
+    num_subcarriers = hparams.get('num_subcarriers', 30)
+    test_data = torch.randn(16, 6, time_step, num_subcarriers)
+    print(f'测试数据形状: {test_data.shape}')
+
     with torch.no_grad():
-        logits = model(test_data)
-        predictions = torch.argmax(logits, dim=1)
-    
-    print(f"模型输出形状: {logits.shape}")
-    print(f"预测类别: {predictions}")
-    
-    # 统计预测分布
-    unique_preds = torch.unique(predictions)
-    print(f"预测的唯一类别数: {len(unique_preds)}")
-    print(f"预测类别范围: [{predictions.min()}, {predictions.max()}]")
-    
-    if len(unique_preds) > 5:
-        print("SUCCESS: 模型能预测多个不同类别!")
+        preds = model(test_data)
+
+    print(f'模型输出形状: {preds.shape}')
+    print('前 5 个预测坐标:')
+    print(preds[:5])
+
+    if preds.shape == (16, 2) and torch.isfinite(preds).all():
+        print('SUCCESS: 模型输出为有效的二维坐标回归结果')
     else:
-        print("WARNING: 模型预测仍集中在少数类别")
-        
+        print('WARNING: 模型输出形状或数值异常')
 else:
-    print("ERROR: 检查点文件不存在")
+    print('ERROR: 检查点文件不存在')

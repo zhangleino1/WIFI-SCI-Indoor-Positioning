@@ -31,17 +31,15 @@ def get_callbacks(args):
     return [checkpoint_cb, early_stop_cb, lr_monitor]
 
 
-def get_model(args, num_classes: int):
+def get_model(args):
     """Instantiate the selected model architecture."""
-    num_subcarriers = 30
     common = dict(
         lr=args.lr,
         lr_factor=args.lr_factor,
         lr_patience=args.lr_patience,
         lr_eps=args.lr_eps,
-        num_classes=num_classes,        # kept for API compat; not used by regression
         time_step=args.time_step,
-        num_subcarriers=num_subcarriers,
+        num_subcarriers=args.num_subcarriers,
         reg_loss=args.reg_loss,
     )
     if args.model_type == 'cnn':
@@ -60,8 +58,11 @@ def train(args):
         time_step=args.time_step,
         data_dir=args.data_dir,
         stride=args.stride,
+        split_mode=args.split_mode,
+        split_seed=args.split_seed,
     )
-    model   = get_model(args, data_module.num_classes)
+    args.num_subcarriers = data_module.num_subcarriers
+    model   = get_model(args)
     logger  = TensorBoardLogger('./logs', name=args.model_type)
 
     accelerator = 'gpu' if torch.cuda.is_available() else 'cpu'
@@ -78,7 +79,10 @@ def train(args):
         min_steps=args.min_steps,
     )
     trainer.fit(model, datamodule=data_module)
-    trainer.test(model, datamodule=data_module)
+    if args.fast_dev_run:
+        trainer.test(model, datamodule=data_module)
+    else:
+        trainer.test(ckpt_path='best', datamodule=data_module)
 
 
 def test(args):
@@ -88,7 +92,10 @@ def test(args):
         time_step=args.time_step,
         data_dir=args.data_dir,
         stride=args.stride,
+        split_mode=args.split_mode,
+        split_seed=args.split_seed,
     )
+    args.num_subcarriers = data_module.num_subcarriers
     logger = TensorBoardLogger('./logs', name=f'{args.model_type}_test')
 
     load_kwargs = dict(
@@ -96,9 +103,8 @@ def test(args):
         lr_factor=args.lr_factor,
         lr_patience=args.lr_patience,
         lr_eps=args.lr_eps,
-        num_classes=data_module.num_classes,
         time_step=args.time_step,
-        num_subcarriers=30,
+        num_subcarriers=args.num_subcarriers,
         reg_loss=args.reg_loss,
     )
 
@@ -117,7 +123,6 @@ def test(args):
         devices=1 if accelerator == 'gpu' else None,
         max_epochs=args.max_epochs,
         min_epochs=args.min_epochs,
-        callbacks=get_callbacks(args),
         logger=logger,
         fast_dev_run=args.fast_dev_run,
         min_steps=args.min_steps,
@@ -136,6 +141,10 @@ if __name__ == '__main__':
     parser.add_argument('--stride',      type=int, default=2,
                         help='Sliding window step between samples')
     parser.add_argument('--num_workers', type=int, default=8)
+    parser.add_argument('--split_mode',  type=str, default='by_location',
+                        choices=['by_location', 'random'],
+                        help='Dataset split strategy. by_location avoids leakage from overlapping windows.')
+    parser.add_argument('--split_seed',  type=int, default=42)
 
     # ---- model ----
     parser.add_argument('--model_type',  type=str, default='cnn',
@@ -158,7 +167,7 @@ if __name__ == '__main__':
     parser.add_argument('--max_epochs',  type=int,   default=120)
     parser.add_argument('--min_epochs',  type=int,   default=10)
     parser.add_argument('--min_steps',   type=int,   default=5)
-    parser.add_argument('--fast_dev_run', default=False, type=bool,
+    parser.add_argument('--fast_dev_run', action='store_true',
                         help='Run one batch for quick debugging')
 
     # ---- mode ----

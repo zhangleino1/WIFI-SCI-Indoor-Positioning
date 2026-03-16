@@ -152,7 +152,7 @@ python main.py --model_type cnn_transformer --data_dir ./dataset --mode train
 -   `<model_type>` 是您选择的模型 (e.g., `cnn_lstm`)。
 -   `<N>` 是实验的版本号。
 -   `last.ckpt`: 保存最后一个训练周期结束时的模型状态。
--   形如 `<model_type>-best-epoch=XX-val_dist=Y.YYY.ckpt`: 保存验证集上平均距离误差最小的模型状态。
+-   形如 `<model_type>-best-epoch=XX-val_loss=Y.YYY.ckpt`: 保存验证损失最优的模型状态。
 
 这些检查点可以通过 `--cpt_path` 参数加载，用于继续训练或进行测试评估。
 
@@ -167,6 +167,9 @@ python main.py --model_type cnn_transformer --data_dir ./dataset --mode train
 -   `--stride`: (整数) 在生成样本时，连续样本之间的滑动步长。默认为 `2`。
 -   `--num_workers`: (整数) DataLoader使用的工作进程数。默认为 `8`。
 -   `--fast_dev_run`: (布尔值) 如果为True，则运行一个批次的训练和验证，用于快速调试。默认为 `False`。
+-   `--split_mode`: (字符串) 数据集划分方式。可选: `'by_location'`, `'random'`。默认为 `'by_location'`。
+    - `by_location`: 按位置点划分训练/验证/测试集，避免重叠滑窗泄漏，更适合评估泛化能力。
+    - `random`: 按样本窗口随机划分，结果通常更乐观，仅适合快速调试。
 -   `--mode`: (字符串) 运行模式。可选: `'train'`, `'test'`。默认为 `'train'`。
 -   `--reg_loss`: (字符串) 回归损失函数。可选: `'smooth_l1'`, `'mse'`, `'mae'`。默认为 `'smooth_l1'`。
     - `smooth_l1` (Huber Loss): 对离群点鲁棒，兼顾MSE和MAE的优点，**推荐默认选项**。
@@ -212,7 +215,7 @@ python main.py --mode test --model_type cnn_lstm --data_dir ./dataset \
 - **平均欧氏距离误差** (mean Euclidean distance error，单位：网格单元)
 - **中位欧氏距离误差** (median error)
 - **命中率** (within 1 / 2 / 3 网格单元的样本占比)
-- **误差CDF图**: `{model_name}_regression_cdf.png`（保存到 TensorBoard 日志目录）
+- **误差CDF图**: `{model_name}_regression_cdf.png`（保存到 `results/{model_name}_results/`）
 - **预测散点图**: `{model_name}_regression_scatter.png`（真实坐标 vs 预测坐标）
 
 ### 测试不同检查点的模型
@@ -220,7 +223,7 @@ python main.py --mode test --model_type cnn_lstm --data_dir ./dataset \
 ```powershell
 # 示例：测试 CNN_LSTM 模型的最佳检查点 (文件名可能因您的训练结果而异)
 python main.py --mode test --model_type cnn_lstm --data_dir ./dataset \
-  --cpt_path ./logs/cnn_lstm/version_0/checkpoints/cnn_lstm-best-epoch=XX-val_dist=Y.YYY.ckpt
+  --cpt_path ./logs/cnn_lstm/version_0/checkpoints/cnn_lstm-best-epoch=XX-val_loss=Y.YYY.ckpt
 ```
 
 ## 可视化分析
@@ -248,11 +251,17 @@ A:
 
 ### Q: 如何处理过拟合问题?
 A:
-1.  **早停 (EarlyStopping)**: 已通过 PyTorch Lightning Callbacks 实现，监控 `val_dist`（验证集平均距离误差）。
-2.  **学习率调度**: 使用 ReduceLROnPlateau，验证集 `val_dist` 不下降时自动降低学习率。
+1.  **早停 (EarlyStopping)**: 已通过 PyTorch Lightning Callbacks 实现，监控 `val_loss`。
+2.  **学习率调度**: 使用 ReduceLROnPlateau，验证集 `val_loss` 不下降时自动降低学习率。
 3.  **正则化**: 模型中已使用批归一化 (BatchNorm) 和 Dropout。
 4.  **减小模型复杂度**: 尝试减少卷积层数、通道数，或减小LSTM/Transformer的隐藏单元数。
 5.  **增加数据量**: 收集更多样化的数据。
+
+### Q: `by_location` 划分有什么局限?
+A:
+-   该模式会把测试集位置点完全从训练集中隔离，更接近真实泛化测试。
+-   如果位置点总数较少，测试集可能只包含少量位置，指标方差会偏大。
+-   随机划分位置时，训练集和测试集的空间覆盖可能不均匀；解读结果时要结合位置分布图一起看。
 
 ### Q: 如何改进定位精度?
 A:

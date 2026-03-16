@@ -1,195 +1,160 @@
 # 作者：程序员石磊，盗用卖钱可耻，在github即可搜到
-import os
-import torch
-import numpy as np
-import matplotlib.pyplot as plt
 import argparse
-from sklearn.metrics import confusion_matrix
-import seaborn as sns
-from csi_dataset import CSIDataset, CSIDataModule
-from cnn_net_model import CNN_Net
-from cnn_lstm_net_model import CNN_LSTM_Net
+import os
 
-def analyze_spatial_confusion(model_path, data_dir, model_type='cnn_lstm', batch_size=32):
-    """
-    Analyze how confusion relates to physical distance between locations
-    """
-    # Setup the data module
-    data_module = CSIDataModule(
-        batch_size=batch_size, 
-        num_workers=4, 
-        time_step=15, 
-        data_dir=data_dir,
-        stride=1
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
+from csi_dataset import CSIDataModule
+from cnn_lstm_net_model import CNN_LSTM_Net
+from cnn_net_model import CNN_Net
+from cnn_transformer_model import CNN_Transformer_Net
+
+
+def load_model(model_path, model_type, data_module, reg_loss):
+    load_kwargs = dict(
+        lr=0.001,
+        lr_factor=0.1,
+        lr_patience=10,
+        lr_eps=1e-6,
+        time_step=data_module.time_step,
+        num_subcarriers=data_module.num_subcarriers,
+        reg_loss=reg_loss,
     )
-    
-    # Get the number of classes and mapping
-    num_classes = data_module.num_classes
-    loc_to_class = data_module.dataset.location_to_class
-    class_to_loc = {v: k for k, v in loc_to_class.items()}
-    
-    # Setup device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    
-    # Load the model
+
     if model_type == 'cnn':
-        model = CNN_Net.load_from_checkpoint(
-            model_path,
-            lr=0.0001,
-            lr_factor=0.1,
-            lr_patience=10,
-            lr_eps=1e-6,
-            num_classes=num_classes
-        )
-    elif model_type == 'cnn_lstm':
-        model = CNN_LSTM_Net.load_from_checkpoint(
-            model_path,
-            lr=0.0001,
-            lr_factor=0.1,
-            lr_patience=10,
-            lr_eps=1e-6,
-            num_classes=num_classes
-        )
-    
-    model = model.to(device)
+        return CNN_Net.load_from_checkpoint(model_path, **load_kwargs)
+    if model_type == 'cnn_lstm':
+        return CNN_LSTM_Net.load_from_checkpoint(model_path, **load_kwargs)
+    if model_type == 'cnn_transformer':
+        return CNN_Transformer_Net.load_from_checkpoint(model_path, **load_kwargs)
+    raise ValueError(f'Unsupported model type: {model_type}')
+
+
+def analyze_spatial_confusion(args):
+    data_module = CSIDataModule(
+        batch_size=args.batch_size,
+        num_workers=args.num_workers,
+        time_step=args.time_step,
+        data_dir=args.data_dir,
+        stride=args.stride,
+        split_mode=args.split_mode,
+        split_seed=args.split_seed,
+    )
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = load_model(args.model_path, args.model_type, data_module, args.reg_loss).to(device)
     model.eval()
-    
-    # Get the test dataloader
-    test_loader = data_module.test_dataloader()
-    
-    # Initialize lists to store predictions and targets
+
     all_preds = []
     all_targets = []
-    
-    # Run prediction
     with torch.no_grad():
-        for data, targets in test_loader:
-            data, targets = data.to(device), targets.to(device)
-            outputs = model(data)
-            preds = torch.argmax(outputs, dim=1)
-            
-            # Store predictions and targets
-            all_preds.extend(preds.cpu().numpy())
-            all_targets.extend(targets.cpu().numpy())
-    
-    # Calculate confusion matrix
-    cm = confusion_matrix(all_targets, all_preds)
-    
-    # Calculate physical distance matrix between all class locations
-    distance_matrix = np.zeros((num_classes, num_classes))
-    for i in range(num_classes):
-        loc_i = class_to_loc[i]
-        x1, y1 = int(loc_i[0]), int(loc_i[1])
-        
-        for j in range(num_classes):
-            loc_j = class_to_loc[j]
-            x2, y2 = int(loc_j[0]), int(loc_j[1])
-            
-            # Calculate Euclidean distance
-            distance_matrix[i, j] = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
-    
-    # Create data for the error vs distance analysis
-    errors = []
-    distances = []
-    
-    for i in range(num_classes):
-        for j in range(num_classes):
-            if i != j:  # Skip the diagonal
-                # Number of times class i was predicted as class j
-                error_count = cm[i, j]
-                
-                # The physical distance between locations
-                dist = distance_matrix[i, j]
-                
-                # Add to lists
-                errors.append(error_count)
-                distances.append(dist)
-    
-    # Create scatter plot
-    plt.figure(figsize=(12, 8))
-    plt.scatter(distances, errors, alpha=0.6, s=50)
-    
-    # Add trend line
-    z = np.polyfit(distances, errors, 1)
-    p = np.poly1d(z)
-    plt.plot(sorted(distances), p(sorted(distances)), "r--", linewidth=2)
-    
-    plt.xlabel('Physical Distance Between Locations (meters)')
-    plt.ylabel('Number of Confusion Errors')
-    plt.title(f'{model_type.upper()} - Relationship Between Physical Distance and Classification Errors')
-    plt.grid(True)
-    plt.tight_layout()
-    plt.savefig(f'{model_type}_distance_vs_errors.png', dpi=300)
-    plt.show()
-    
-    # Create a heatmap of the normalized confusion matrix with physical distances
-    plt.figure(figsize=(14, 12))
-    
-    # Normalize the confusion matrix
-    cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-    
-    # Create DataFrame for better plot labels
-    class_labels = [f"({class_to_loc[i][0]},{class_to_loc[i][1]})" for i in range(num_classes)]
-    
-    # Create heatmap with annotations showing physical distance
-    ax = sns.heatmap(cm_norm, annot=False, cmap='Blues', xticklabels=class_labels, yticklabels=class_labels)
-    
-    # Add distance annotations to cells with significant errors
-    for i in range(num_classes):
-        for j in range(num_classes):
-            # Skip the diagonal and cells with very small values
-            if i != j and cm_norm[i, j] > 0.05:  # Only show for significant errors (>5%)
-                ax.text(j + 0.5, i + 0.5, f'd={distance_matrix[i, j]:.1f}m', 
-                        ha='center', va='center', fontsize=8, 
-                        color='white' if cm_norm[i, j] > 0.3 else 'black')
-    
-    plt.xlabel('Predicted Location')
-    plt.ylabel('True Location')
-    plt.title(f'{model_type.upper()} - Confusion Matrix with Physical Distances (m)')
-    plt.tight_layout()
-    plt.savefig(f'{model_type}_confusion_with_distances.png', dpi=300)
-    plt.show()
-    
-    # Create a histogram of error distances
-    error_distances = []
-    for i, (true_class, pred_class) in enumerate(zip(all_targets, all_preds)):
-        if true_class != pred_class:  # If prediction was wrong
-            error_dist = distance_matrix[true_class, pred_class]
-            error_distances.append(error_dist)
-    
-    if error_distances:
-        plt.figure(figsize=(10, 6))
-        
-        # Plot histogram
-        plt.hist(error_distances, bins=20, alpha=0.7, color='blue', edgecolor='black')
-        
-        # Calculate mean and median
-        mean_dist = np.mean(error_distances)
-        median_dist = np.median(error_distances)
-        
-        # Add vertical lines for mean and median
-        plt.axvline(mean_dist, color='red', linestyle='dashed', linewidth=2, label=f'Mean: {mean_dist:.2f}m')
-        plt.axvline(median_dist, color='green', linestyle='dashed', linewidth=2, label=f'Median: {median_dist:.2f}m')
-        
-        plt.xlabel('Distance Between True and Predicted Locations (meters)')
-        plt.ylabel('Count')
-        plt.title(f'{model_type.upper()} - Distribution of Error Distances')
-        plt.legend()
-        plt.grid(True)
-        plt.tight_layout()
-        plt.savefig(f'{model_type}_error_distance_histogram.png', dpi=300)
-        plt.show()
-    else:
-        print("No classification errors to plot!")
+        for data, targets in data_module.test_dataloader():
+            preds = model(data.to(device))
+            all_preds.append(preds.cpu().numpy())
+            all_targets.append(targets.numpy())
+
+    preds = np.concatenate(all_preds, axis=0)
+    targets = np.concatenate(all_targets, axis=0)
+    errors = preds - targets
+    distances = np.sqrt((errors ** 2).sum(axis=1))
+    true_radius = np.sqrt((targets ** 2).sum(axis=1))
+
+    output_dir = os.path.join(os.getcwd(), 'results', f'{args.model_type}_spatial_analysis')
+    os.makedirs(output_dir, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.scatter(true_radius, distances, alpha=0.5, s=18)
+    if len(true_radius) > 1:
+        coeffs = np.polyfit(true_radius, distances, deg=1)
+        line_x = np.linspace(true_radius.min(), true_radius.max(), 200)
+        line_y = coeffs[0] * line_x + coeffs[1]
+        ax.plot(line_x, line_y, 'r--', linewidth=2, label='Linear trend')
+        ax.legend()
+    ax.set_xlabel('Distance of True Position from Origin')
+    ax.set_ylabel('Prediction Error Distance')
+    ax.set_title(f'{args.model_type.upper()} Spatial Error vs True Position Radius')
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, f'{args.model_type}_error_vs_radius.png'), dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 6))
+    ax.hist(distances, bins=20, alpha=0.8, color='tab:blue', edgecolor='black')
+    mean_dist = distances.mean()
+    median_dist = np.median(distances)
+    ax.axvline(mean_dist, color='red', linestyle='--', linewidth=2, label=f'Mean {mean_dist:.2f}')
+    ax.axvline(median_dist, color='green', linestyle='--', linewidth=2, label=f'Median {median_dist:.2f}')
+    ax.set_xlabel('Prediction Error Distance')
+    ax.set_ylabel('Count')
+    ax.set_title(f'{args.model_type.upper()} Regression Error Distribution')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, f'{args.model_type}_error_histogram.png'), dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    q = ax.quiver(
+        targets[:, 0],
+        targets[:, 1],
+        errors[:, 0],
+        errors[:, 1],
+        distances,
+        angles='xy',
+        scale_units='xy',
+        scale=1,
+        cmap='viridis',
+        width=0.004,
+    )
+    plt.colorbar(q, ax=ax, label='Error Distance')
+    ax.scatter(targets[:, 0], targets[:, 1], c='black', s=10, alpha=0.35)
+    ax.set_xlabel('True X')
+    ax.set_ylabel('True Y')
+    ax.set_title(f'{args.model_type.upper()} Error Vectors by Position')
+    ax.set_aspect('equal', adjustable='box')
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(output_dir, f'{args.model_type}_error_vectors.png'), dpi=150)
+    plt.close(fig)
+
+    print(f'Mean Distance Error   : {mean_dist:.4f}')
+    print(f'Median Distance Error : {median_dist:.4f}')
+    print(f'Plots saved to {output_dir}')
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Analyze spatial confusion in indoor positioning")
-    parser.add_argument("--model_path", type=str, help="Path to trained model checkpoint",default=os.getcwd()+"/logs/cnn_lstm/version_2/checkpoints/cnn_lstm-best-epoch=22-val_loss=4.505.ckpt")
-    parser.add_argument("--data_dir", type=str, default=os.getcwd()+"/dataset", help="Directory containing CSI data")
-    parser.add_argument("--model_type", type=str, default='cnn_lstm', choices=['cnn', 'cnn_lstm'], help="Model type to evaluate")
-    parser.add_argument("--batch_size", type=int, default=32, help="Batch size for evaluation")
-    
-    args = parser.parse_args()
-    
-    analyze_spatial_confusion(args.model_path, args.data_dir, args.model_type, args.batch_size)
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Analyze spatial error patterns for regression models')
+    parser.add_argument(
+        '--model_path',
+        type=str,
+        default=os.path.join(os.getcwd(), 'logs/cnn_lstm/version_0/checkpoints/last.ckpt'),
+        help='Path to trained model checkpoint',
+    )
+    parser.add_argument('--data_dir', type=str, default=os.path.join(os.getcwd(), 'dataset'))
+    parser.add_argument(
+        '--model_type',
+        type=str,
+        default='cnn_lstm',
+        choices=['cnn', 'cnn_lstm', 'cnn_transformer'],
+    )
+    parser.add_argument('--batch_size', type=int, default=32)
+    parser.add_argument('--num_workers', type=int, default=4)
+    parser.add_argument('--time_step', type=int, default=15)
+    parser.add_argument('--stride', type=int, default=2)
+    parser.add_argument(
+        '--split_mode',
+        type=str,
+        default='by_location',
+        choices=['by_location', 'random'],
+    )
+    parser.add_argument('--split_seed', type=int, default=42)
+    parser.add_argument(
+        '--reg_loss',
+        type=str,
+        default='smooth_l1',
+        choices=['smooth_l1', 'mse', 'mae'],
+    )
+
+    analyze_spatial_confusion(parser.parse_args())

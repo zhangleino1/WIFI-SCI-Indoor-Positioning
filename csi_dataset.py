@@ -5,6 +5,7 @@ import numpy as np
 import glob
 import os
 import re
+from typing import Optional
 
 import torch
 from sklearn.model_selection import train_test_split
@@ -32,6 +33,7 @@ class CSIDataset(Dataset):
         self.time_step = time_step
         self.stride    = stride
         self.data_cache: dict = {}
+        self.num_subcarriers: Optional[int] = None
 
         # ---------- discover unique locations ----------
         all_files = glob.glob(os.path.join(directory, 'antenna_*.csv'))
@@ -39,20 +41,18 @@ class CSIDataset(Dataset):
             raise FileNotFoundError(
                 f"No CSV files found in {directory} matching 'antenna_*.csv'")
 
-        location_classes: set = set()
+        locations: set = set()
         for fp in all_files:
             m = re.search(r'antenna_\d+_(\d+)_(\d+)\.csv', os.path.basename(fp))
             if m:
-                location_classes.add((int(m.group(1)), int(m.group(2))))
+                locations.add((int(m.group(1)), int(m.group(2))))
 
-        if not location_classes:
+        if not locations:
             raise ValueError(f"Could not parse any locations from file names in {directory}")
 
-        # Stable sorted mapping (kept for debugging / visualisation tools)
-        self.location_to_class = {loc: idx for idx, loc in enumerate(sorted(location_classes))}
-        self.class_to_location = {idx: loc for loc, idx in self.location_to_class.items()}
-        self.num_classes = len(location_classes)
-        print(f"Found {self.num_classes} unique locations: {sorted(location_classes)}")
+        self.locations = sorted(locations)
+        self.num_locations = len(self.locations)
+        print(f"Found {self.num_locations} unique locations: {self.locations}")
 
         self._load_all_data()
         self._prepare_index_map()
@@ -60,9 +60,7 @@ class CSIDataset(Dataset):
     # ------------------------------------------------------------------
 
     def _load_all_data(self):
-        device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-        for location in self.location_to_class:
+        for location in self.locations:
             x, y = location
             file_paths = [
                 os.path.join(self.directory, f'antenna_1_{x}_{y}.csv'),
@@ -74,6 +72,7 @@ class CSIDataset(Dataset):
                 continue
 
             location_data = []
+            num_rows = None
             for fp in file_paths:
                 print(f"Loading {fp}")
                 df  = pd.read_csv(fp, na_values='#NAME?')
@@ -82,15 +81,35 @@ class CSIDataset(Dataset):
 
                 if amp.shape[0] == 0 or pha.shape[0] == 0:
                     raise ValueError(f"Empty data in {fp}")
+                if amp.shape != pha.shape:
+                    raise ValueError(
+                        f"Amplitude/phase shape mismatch in {fp}: {amp.shape} vs {pha.shape}")
+
+                if self.num_subcarriers is None:
+                    self.num_subcarriers = amp.shape[1]
+                elif amp.shape[1] != self.num_subcarriers:
+                    raise ValueError(
+                        f"Inconsistent num_subcarriers in {fp}: expected "
+                        f"{self.num_subcarriers}, got {amp.shape[1]}")
+
+                if num_rows is None:
+                    num_rows = amp.shape[0]
+                elif amp.shape[0] != num_rows:
+                    raise ValueError(
+                        f"Inconsistent row count across antennas at {location}: "
+                        f"expected {num_rows}, got {amp.shape[0]} in {fp}")
 
                 amp = min_max_normalization(median_filter(amp))
                 pha = min_max_normalization(median_filter(pha))
 
                 location_data.append((
-                    torch.tensor(amp, dtype=torch.float32).to(device),
-                    torch.tensor(pha, dtype=torch.float32).to(device),
+                    torch.tensor(amp, dtype=torch.float32),
+                    torch.tensor(pha, dtype=torch.float32),
                 ))
             self.data_cache[location] = location_data
+
+        if self.num_subcarriers is None:
+            raise ValueError("Could not infer num_subcarriers from dataset.")
 
     def _prepare_index_map(self):
         self.sample_info_list: list = []
@@ -100,11 +119,8 @@ class CSIDataset(Dataset):
                 print(f"Warning: location {location} has only {num_rows} rows "
                       f"(< time_step={self.time_step}). Skipping.")
                 continue
-            num_segments = (num_rows - self.time_step + 1) // self.stride
-            if num_segments <= 0:
-                continue
-            for seg in range(num_segments):
-                self.sample_info_list.append((location, seg))
+            for start in range(0, num_rows - self.time_step + 1, self.stride):
+                self.sample_info_list.append((location, start))
 
         self.total_samples = len(self.sample_info_list)
         if self.total_samples == 0:
@@ -117,10 +133,8 @@ class CSIDataset(Dataset):
         return self.total_samples
 
     def __getitem__(self, idx):
-        location, seg_idx = self.sample_info_list[idx]
+        location, start = self.sample_info_list[idx]
         location_data     = self.data_cache[location]
-
-        start = seg_idx * self.stride
         end   = start + self.time_step
 
         channels = []
@@ -130,13 +144,8 @@ class CSIDataset(Dataset):
 
         sample_data = torch.stack(channels)           # (6, time_step, num_subcarriers)
 
-        if idx == 0:
-            print(f"CSIDataset sample[0]: shape={sample_data.shape}, location={location}, "
-                  f"min={sample_data.min():.4f}, max={sample_data.max():.4f}")
-
         x_coord, y_coord = location
-        target = torch.tensor([float(x_coord), float(y_coord)],
-                               dtype=torch.float32, device=sample_data.device)
+        target = torch.tensor([float(x_coord), float(y_coord)], dtype=torch.float32)
         return sample_data, target
 
 
@@ -149,16 +158,20 @@ class CSIDataModule(pl.LightningDataModule):
     """
 
     def __init__(self, batch_size: int, num_workers: int,
-                 time_step: int, data_dir: str, stride: int):
+                 time_step: int, data_dir: str, stride: int,
+                 split_mode: str = 'by_location', split_seed: int = 42):
         super().__init__()
         self.batch_size  = batch_size
         self.num_workers = num_workers
         self.time_step   = time_step
         self.data_dir    = data_dir
         self.stride      = stride
+        self.split_mode  = split_mode
+        self.split_seed  = split_seed
 
         self.dataset     = CSIDataset(directory=data_dir, time_step=time_step, stride=stride)
-        self.num_classes = self.dataset.num_classes   # kept for visualisation tools
+        self.num_locations = self.dataset.num_locations
+        self.num_subcarriers = self.dataset.num_subcarriers
 
         # Print sample counts per location
         print("\n--- Location Sample Counts ---")
@@ -169,10 +182,43 @@ class CSIDataModule(pl.LightningDataModule):
             print(f"  Location {loc}: {loc_counts[loc]} samples")
         print(f"  Total: {self.dataset.total_samples}\n")
 
-        # Train / val / test split
-        indices = list(range(len(self.dataset)))
-        train_idx, tmp_idx = train_test_split(indices, test_size=0.4, random_state=42)
-        val_idx,   test_idx = train_test_split(tmp_idx,  test_size=0.5, random_state=42)
+        if self.split_mode == 'random':
+            indices = list(range(len(self.dataset)))
+            train_idx, tmp_idx = train_test_split(
+                indices, test_size=0.4, random_state=self.split_seed)
+            val_idx, test_idx = train_test_split(
+                tmp_idx, test_size=0.5, random_state=self.split_seed)
+        elif self.split_mode == 'by_location':
+            valid_locations = sorted({location for location, _ in self.dataset.sample_info_list})
+            if len(valid_locations) < 3:
+                raise ValueError("Need at least 3 valid locations for by_location split.")
+
+            train_locs, tmp_locs = train_test_split(
+                valid_locations, test_size=0.4, random_state=self.split_seed)
+            val_locs, test_locs = train_test_split(
+                tmp_locs, test_size=0.5, random_state=self.split_seed)
+
+            train_locs = set(train_locs)
+            val_locs = set(val_locs)
+            test_locs = set(test_locs)
+
+            train_idx = [
+                idx for idx, (location, _) in enumerate(self.dataset.sample_info_list)
+                if location in train_locs
+            ]
+            val_idx = [
+                idx for idx, (location, _) in enumerate(self.dataset.sample_info_list)
+                if location in val_locs
+            ]
+            test_idx = [
+                idx for idx, (location, _) in enumerate(self.dataset.sample_info_list)
+                if location in test_locs
+            ]
+            print(
+                f"Split by location: train={len(train_locs)} locs, "
+                f"val={len(val_locs)} locs, test={len(test_locs)} locs")
+        else:
+            raise ValueError(f"Unsupported split_mode: {self.split_mode}")
 
         self.train_dataset = torch.utils.data.Subset(self.dataset, train_idx)
         self.val_dataset   = torch.utils.data.Subset(self.dataset, val_idx)

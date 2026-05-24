@@ -20,6 +20,7 @@ def load_model(model_path, model_type, data_module, reg_loss):
         lr_eps=1e-6,
         time_step=data_module.time_step,
         num_subcarriers=data_module.num_subcarriers,
+        in_channels=data_module.in_channels,
         reg_loss=reg_loss,
     )
 

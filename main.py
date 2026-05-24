@@ -40,6 +40,7 @@ def get_model(args):
         lr_eps=args.lr_eps,
         time_step=args.time_step,
         num_subcarriers=args.num_subcarriers,
+        in_channels=args.in_channels,
         reg_loss=args.reg_loss,
     )
     if args.model_type == 'cnn':
@@ -62,6 +63,7 @@ def train(args):
         split_seed=args.split_seed,
     )
     args.num_subcarriers = data_module.num_subcarriers
+    args.in_channels = data_module.in_channels
     model   = get_model(args)
     logger  = TensorBoardLogger('./logs', name=args.model_type)
 
@@ -70,7 +72,7 @@ def train(args):
 
     trainer = pl.Trainer(
         accelerator=accelerator,
-        devices=1 if accelerator == 'gpu' else None,
+        devices=1,
         max_epochs=args.max_epochs,
         min_epochs=args.min_epochs,
         callbacks=get_callbacks(args),
@@ -96,6 +98,7 @@ def test(args):
         split_seed=args.split_seed,
     )
     args.num_subcarriers = data_module.num_subcarriers
+    args.in_channels = data_module.in_channels
     logger = TensorBoardLogger('./logs', name=f'{args.model_type}_test')
 
     load_kwargs = dict(
@@ -105,6 +108,7 @@ def test(args):
         lr_eps=args.lr_eps,
         time_step=args.time_step,
         num_subcarriers=args.num_subcarriers,
+        in_channels=args.in_channels,
         reg_loss=args.reg_loss,
     )
 
@@ -120,7 +124,7 @@ def test(args):
     accelerator = 'gpu' if torch.cuda.is_available() else 'cpu'
     trainer = pl.Trainer(
         accelerator=accelerator,
-        devices=1 if accelerator == 'gpu' else None,
+        devices=1,
         max_epochs=args.max_epochs,
         min_epochs=args.min_epochs,
         logger=logger,

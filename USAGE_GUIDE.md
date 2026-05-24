@@ -38,7 +38,7 @@ conda activate csi-positioning
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 conda install lightning -c conda-forge
 pip install -U 'tensorboardX' 'tensorboard'
-pip install scikit-learn matplotlib seaborn pandas
+pip install scikit-learn matplotlib seaborn pandas h5py
 ```
 
 ### 检查CUDA是否可用
@@ -56,37 +56,42 @@ else:
 ## 数据准备
 
 ### 数据格式
-项目使用的CSV数据文件应遵循以下命名格式：
+项目使用 MATLAB v7.3 `.mat` 数据文件。文件名应遵循以下格式：
 ```
-antenna_<天线号>_<x坐标>_<y坐标>.csv
+CSI_RX_x_p{X}d{DEC}_y_p{Y}d{DEC}_z_p{Z}d{DEC}_{DATE}_{TIME}.mat
 ```
 
-例如：`antenna_1_3_5.csv` 表示天线1在坐标(3,5)处采集的CSI数据。
+例如：`CSI_RX_x_p1d000_y_p3d000_z_p0d000_20260520_155612.mat`
+表示在坐标 `(1.0, 3.0)` 处采集的 CSI 数据。
 
-每个CSV文件包含幅度和相位数据，列命名格式为：
-- 幅度列: `amplitude_0`, `amplitude_1`, ... , `amplitude_N-1` (N为子载波数)
-- 相位列: `phase_0`, `phase_1`, ... , `phase_N-1`
+每个 `.mat` 文件包含一个位置的完整 CSI 数据，训练默认使用：
+- 幅度: `csiAmplitudeFiltered`，形状为 `(2, 100, 1000)`
+- 相位: `csiPhaseCalibrated`，形状为 `(2, 100, 1000)`
+- 坐标: `coord/x` 和 `coord/y`
 
 ### 输入数据通道说明
-模型期望的输入数据为 **6通道**。这6个通道由以下方式构成：
-- **3个天线**: 系统处理来自3个不同天线的CSI数据。
+模型期望的输入数据为 **4通道**。这4个通道由以下方式构成：
+- **2个天线**: 系统处理来自2个接收天线的CSI数据。
 - **2种特征**: 对于每个天线，提取两种信号特征：
     1.  **幅度 (Amplitude)** 数据
     2.  **相位 (Phase)** 数据
 
 因此，数据组织方式为：
-`[天线1幅度, 天线1相位, 天线2幅度, 天线2相位, 天线3幅度, 天线3相位]`
+`[天线1幅度, 天线1相位, 天线2幅度, 天线2相位]`
 每个通道的形状为 `(time_step, num_subcarriers)`。
-最终输入到模型的样本数据形状为 `(6, time_step, num_subcarriers)`。
+最终输入到模型的样本数据形状为 `(4, time_step, 100)`。
 
 ### 数据处理流程
-1.  **原始数据转换 (可选)**: 如果您有原始 `.dat` 格式的CSI数据，可以使用 `data_process.py` 将其转换为项目所需的CSV格式。
-    ```powershell
-    python data_process.py --input_dir ./raw_data --output_dir ./dataset
-    ```
-    *注意: `dataset` 目录中已提供少量样本数据用于快速测试。如需处理完整数据集，请确保 `raw_data` 目录包含您的 `.dat` 文件。*
+1.  **数据加载**: `CSIDataset` 会扫描 `--data_dir` 下的
+    `CSI_RX_*.mat` 文件，读取坐标、幅度和相位数据。
 
-2.  **数据质量检查 (可选)**: 使用 `heatmappic.py` 生成CSI数据的热力图，辅助进行数据质量检查。
+2.  **预处理**: 每个天线的幅度和相位数据会从 `(100, 1000)` 转置为
+    `(1000, 100)`，然后执行 `min_max_normalization`。
+
+3.  **滑动窗口采样**: 使用 `time_step` 和 `stride` 生成
+    `(4, time_step, 100)` 的模型输入样本。
+
+4.  **数据质量检查 (可选)**: 使用 `heatmappic.py` 生成 CSI 数据的热力图，辅助进行数据质量检查。
     ```powershell
     python heatmappic.py --data_dir ./dataset
     ```
@@ -158,7 +163,7 @@ python main.py --model_type cnn_transformer --data_dir ./dataset --mode train
 
 ### 常用参数说明
 -   `--model_type`: (字符串) 选择模型架构。可选: `'cnn'`, `'cnn_lstm'`, `'cnn_transformer'`。默认为 `'cnn'`。
--   `--data_dir`: (字符串) 包含CSV格式CSI数据的数据集目录。
+-   `--data_dir`: (字符串) 包含 `.mat` 格式 CSI 数据的数据集目录。
 -   `--batch_size`: (整数) 训练和评估时的批处理大小。默认为 `64`。
 -   `--lr`: (浮点数) 优化器的初始学习率。默认为 `0.001`。
 -   `--max_epochs`: (整数) 最大训练周期数。默认为 `120`。

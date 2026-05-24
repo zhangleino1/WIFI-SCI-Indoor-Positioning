@@ -80,10 +80,8 @@ csi.pdf 仔细看在项目中
 
 
 # 数据集
-csv 文件格式说明：`antenna_1_2_6.csv` → `antenna_天线号_坐标x_坐标y.csv`
-
-[全量csv数据集](https://pan.quark.cn/s/be9b44dd75b6)
-[全量dat原始数据集](https://pan.quark.cn/s/b2349706d0f6)
+数据集使用 MATLAB v7.3 `.mat` 文件，每个文件对应一个位置点：
+`CSI_RX_x_p1d000_y_p3d000_z_p0d000_20260520_155612.mat`。
 
 注意：`dataset` 目录中提供了少量数据集用于快速测试和演示，并非完整数据集。
 
@@ -92,13 +90,12 @@ csv 文件格式说明：`antenna_1_2_6.csv` → `antenna_天线号_坐标x_坐�
 ```
 main.py                     # 训练、测试统一入口脚本
 base_model.py               # 所有模型共用的回归训练/评估/可视化基类
-csi_dataset.py              # Dataset 和 DataModule，输出 float32 [x,y] 坐标目标
+csi_dataset.py              # 读取 .mat 数据的 Dataset 和 DataModule，输出 float32 [x,y] 坐标目标
 cnn_net_model.py            # 纯 CNN 回归模型
 cnn_lstm_net_model.py       # CNN + LSTM 回归模型
 cnn_transformer_model.py    # CNN + Transformer 回归模型
-util.py                     # 数据预处理工具 (归一化、中值滤波)
-data_process.py             # (可选) 原始 .dat → .csv 转换脚本
-heatmappic.py               # (可选) CSI 数据热力图，用于数据质量检查
+util.py                     # 数据预处理工具 (归一化)
+heatmappic.py               # (可选) .mat CSI 数据热力图，用于数据质量检查
 visualize_locations.py      # 可视化数据集中位置点的空间分布
 USAGE_GUIDE.md              # 详细使用指南
 readme.md                   # 本文件
@@ -109,10 +106,10 @@ csi.pdf                     # 参考论文
 
 ## 数据集处理 (`csi_dataset.py`)
 - 采用 PyTorch 的 `Dataset` 和 `DataLoader` 机制高效处理 CSI 数据。
-- 输入数据为 **6 通道**：3 个天线 × (幅度 + 相位)，形状 `(6, time_step, num_subcarriers)`。
+- 输入数据为 **4 通道**：2 个天线 × (幅度 + 相位)，形状 `(4, time_step, 100)`。
 - 每个样本的目标为 **float32 张量 `[x, y]`**，即对应位置的物理坐标（网格单元）。
 - 使用滑动窗口（`time_step`、`stride`）从连续 CSI 测量序列中生成训练样本。
-- 数据集自动扫描目录，发现所有唯一位置点。
+- 数据集自动扫描 `CSI_RX_*.mat` 文件，发现所有唯一位置点。
 
 ## 网络模型
 本项目提供三种基于 PyTorch Lightning 的深度学习回归模型，均继承自 `CSIBaseModel`：
@@ -179,9 +176,10 @@ zhangleilikejay@gmail.com
 - 详细依赖请参见 `USAGE_GUIDE.md`。
 
 ## 数据格式
-- CSV 文件命名：`antenna_<天线号>_<x坐标>_<y坐标>.csv`
-- 每行为一个时间点的 CSI 测量，列格式：`amplitude_0 … amplitude_29, phase_0 … phase_29`
-- 每个位置需有 `antenna_1`, `antenna_2`, `antenna_3` 三个文件
+- `.mat` 文件命名：`CSI_RX_x_p{X}d{DEC}_y_p{Y}d{DEC}_z_p{Z}d{DEC}_{DATE}_{TIME}.mat`
+- 每个文件包含一个位置点的 CSI 数据。
+- 训练使用 `csiAmplitudeFiltered` 和 `csiPhaseCalibrated`，形状均为 `(2, 100, 1000)`。
+- 每个样本输入形状为 `(4, time_step, 100)`。
 
 ## 指纹地图
 
@@ -192,7 +190,7 @@ zhangleilikejay@gmail.com
 # 参照 USAGE_GUIDE.md 中的详细环境配置步骤
 conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
 conda install lightning -c conda-forge
-pip install scikit-learn matplotlib seaborn pandas tensorboard
+pip install scikit-learn matplotlib seaborn pandas h5py tensorboard
 ```
 
 # 可能的未来优化方向

@@ -3,29 +3,27 @@ import pytorch_lightning as pl
 from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import glob
+import h5py
 import os
 import re
 from typing import Optional
 
 import torch
 from sklearn.model_selection import train_test_split
-import pandas as pd
 
-from util import min_max_normalization, median_filter
+from util import min_max_normalization
 
 
 class CSIDataset(Dataset):
     """
-    Loads WiFi CSI data from CSV files and returns (sample, target) pairs
+    Loads WiFi CSI data from MATLAB v7.3 .mat files and returns (sample, target) pairs
     for indoor positioning regression.
 
     Target format: float32 tensor [x, y] — the physical coordinates of the
     measurement location (in grid units).
 
-    File naming: antenna_<antenna_id>_<x>_<y>.csv
-    Each location must have antenna_1, antenna_2, and antenna_3 files.
-    Each row in a CSV file represents one CSI measurement
-    (30 amplitude + 30 phase columns).
+    File naming: CSI_RX_x_p1d000_y_p3d000_z_p0d000_<date>_<time>.mat
+    Each file contains all antennas for one measurement location.
     """
 
     def __init__(self, directory: str, time_step: int, stride: int = 1):
@@ -34,23 +32,31 @@ class CSIDataset(Dataset):
         self.stride    = stride
         self.data_cache: dict = {}
         self.num_subcarriers: Optional[int] = None
+        self.num_antennas: Optional[int] = None
+        self.in_channels: Optional[int] = None
 
-        # ---------- discover unique locations ----------
-        all_files = glob.glob(os.path.join(directory, 'antenna_*.csv'))
+        all_files = sorted(glob.glob(os.path.join(directory, 'CSI_RX_*.mat')))
         if not all_files:
             raise FileNotFoundError(
-                f"No CSV files found in {directory} matching 'antenna_*.csv'")
+                f"No .mat files found in {directory} matching 'CSI_RX_*.mat'")
 
-        locations: set = set()
+        # Build location → file mapping from filenames only (no I/O).
+        # Coordinate validation against the .mat internal coords is deferred
+        # to _load_all_data so each file is opened exactly once.
+        location_files: dict = {}
         for fp in all_files:
-            m = re.search(r'antenna_\d+_(\d+)_(\d+)\.csv', os.path.basename(fp))
-            if m:
-                locations.add((int(m.group(1)), int(m.group(2))))
+            file_location = self._parse_location_from_filename(fp)
+            if file_location in location_files:
+                raise ValueError(
+                    f"Duplicate location {file_location} in {fp} "
+                    f"and {location_files[file_location]}")
+            location_files[file_location] = fp
 
-        if not locations:
-            raise ValueError(f"Could not parse any locations from file names in {directory}")
+        if not location_files:
+            raise ValueError(f"Could not discover any locations in {directory}")
 
-        self.locations = sorted(locations)
+        self.location_files = location_files
+        self.locations = sorted(location_files)
         self.num_locations = len(self.locations)
         print(f"Found {self.num_locations} unique locations: {self.locations}")
 
@@ -59,49 +65,85 @@ class CSIDataset(Dataset):
 
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _decode_coord_token(token: str) -> float:
+        m = re.fullmatch(r'([pn])(\d+)d(\d+)', token)
+        if not m:
+            raise ValueError(f"Invalid coordinate token: {token}")
+
+        sign = 1.0 if m.group(1) == 'p' else -1.0
+        value = float(f"{m.group(2)}.{m.group(3)}")
+        return sign * value
+
+    @classmethod
+    def _parse_location_from_filename(cls, file_path: str):
+        name = os.path.basename(file_path)
+        m = re.search(r'CSI_RX_x_([pn]\d+d\d+)_y_([pn]\d+d\d+)_z_', name)
+        if not m:
+            raise ValueError(f"Could not parse location from file name: {name}")
+        return (
+            cls._decode_coord_token(m.group(1)),
+            cls._decode_coord_token(m.group(2)),
+        )
+
+    @staticmethod
+    def _read_scalar(mat_file, key: str) -> float:
+        if key not in mat_file:
+            raise KeyError(f"Missing required key '{key}'")
+        value = mat_file[key][()]
+        return float(np.asarray(value).squeeze())
+
     def _load_all_data(self):
         for location in self.locations:
-            x, y = location
-            file_paths = [
-                os.path.join(self.directory, f'antenna_1_{x}_{y}.csv'),
-                os.path.join(self.directory, f'antenna_2_{x}_{y}.csv'),
-                os.path.join(self.directory, f'antenna_3_{x}_{y}.csv'),
-            ]
-            if not all(os.path.exists(fp) for fp in file_paths):
-                print(f"Warning: Missing antenna files for location {location}. Skipping.")
-                continue
-
+            fp = self.location_files[location]
+            print(f"Loading {fp}")
             location_data = []
-            num_rows = None
-            for fp in file_paths:
-                print(f"Loading {fp}")
-                df  = pd.read_csv(fp, na_values='#NAME?')
-                amp = df.filter(regex='^amplitude_').values.astype(np.float32)
-                pha = df.filter(regex='^phase_').values.astype(np.float32)
 
-                if amp.shape[0] == 0 or pha.shape[0] == 0:
-                    raise ValueError(f"Empty data in {fp}")
-                if amp.shape != pha.shape:
+            with h5py.File(fp, 'r') as mat_file:
+                # Validate filename coordinates against .mat internal coords
+                mat_x = self._read_scalar(mat_file, 'coord/x')
+                mat_y = self._read_scalar(mat_file, 'coord/y')
+                if not np.allclose(location, (mat_x, mat_y), atol=1e-6):
                     raise ValueError(
-                        f"Amplitude/phase shape mismatch in {fp}: {amp.shape} vs {pha.shape}")
+                        f"Location mismatch in {fp}: "
+                        f"filename={location}, mat=({mat_x}, {mat_y})")
 
-                if self.num_subcarriers is None:
-                    self.num_subcarriers = amp.shape[1]
-                elif amp.shape[1] != self.num_subcarriers:
-                    raise ValueError(
-                        f"Inconsistent num_subcarriers in {fp}: expected "
-                        f"{self.num_subcarriers}, got {amp.shape[1]}")
+                amp_all = mat_file['csiAmplitudeFiltered'][()].astype(np.float32)
+                pha_all = mat_file['csiPhaseCalibrated'][()].astype(np.float32)
 
-                if num_rows is None:
-                    num_rows = amp.shape[0]
-                elif amp.shape[0] != num_rows:
-                    raise ValueError(
-                        f"Inconsistent row count across antennas at {location}: "
-                        f"expected {num_rows}, got {amp.shape[0]} in {fp}")
+            if amp_all.shape != pha_all.shape:
+                raise ValueError(
+                    f"Amplitude/phase shape mismatch in {fp}: "
+                    f"{amp_all.shape} vs {pha_all.shape}")
+            if amp_all.ndim != 3:
+                raise ValueError(
+                    f"Expected CSI arrays with shape "
+                    f"(n_antennas, n_subcarriers, n_packets), got {amp_all.shape} in {fp}")
 
-                amp = min_max_normalization(median_filter(amp))
-                pha = min_max_normalization(median_filter(pha))
+            num_antennas, num_subcarriers, num_packets = amp_all.shape
+            if self.num_antennas is None:
+                self.num_antennas = num_antennas
+                self.in_channels = num_antennas * 2
+            elif num_antennas != self.num_antennas:
+                raise ValueError(
+                    f"Inconsistent num_antennas in {fp}: expected "
+                    f"{self.num_antennas}, got {num_antennas}")
 
+            if self.num_subcarriers is None:
+                self.num_subcarriers = num_subcarriers
+            elif num_subcarriers != self.num_subcarriers:
+                raise ValueError(
+                    f"Inconsistent num_subcarriers in {fp}: expected "
+                    f"{self.num_subcarriers}, got {num_subcarriers}")
+
+            if num_packets == 0:
+                raise ValueError(f"Empty packet dimension in {fp}")
+
+            for ant_idx in range(num_antennas):
+                amp = amp_all[ant_idx].T
+                pha = pha_all[ant_idx].T
+                amp = min_max_normalization(amp)
+                pha = min_max_normalization(pha)
                 location_data.append((
                     torch.tensor(amp, dtype=torch.float32),
                     torch.tensor(pha, dtype=torch.float32),
@@ -110,6 +152,8 @@ class CSIDataset(Dataset):
 
         if self.num_subcarriers is None:
             raise ValueError("Could not infer num_subcarriers from dataset.")
+        if self.in_channels is None:
+            raise ValueError("Could not infer in_channels from dataset.")
 
     def _prepare_index_map(self):
         self.sample_info_list: list = []
@@ -138,11 +182,11 @@ class CSIDataset(Dataset):
         end   = start + self.time_step
 
         channels = []
-        for amp_t, pha_t in location_data:           # 3 antennas
+        for amp_t, pha_t in location_data:
             channels.append(amp_t[start:end, :])
             channels.append(pha_t[start:end, :])
 
-        sample_data = torch.stack(channels)           # (6, time_step, num_subcarriers)
+        sample_data = torch.stack(channels)           # (channels, time_step, num_subcarriers)
 
         x_coord, y_coord = location
         target = torch.tensor([float(x_coord), float(y_coord)], dtype=torch.float32)
@@ -172,6 +216,7 @@ class CSIDataModule(pl.LightningDataModule):
         self.dataset     = CSIDataset(directory=data_dir, time_step=time_step, stride=stride)
         self.num_locations = self.dataset.num_locations
         self.num_subcarriers = self.dataset.num_subcarriers
+        self.in_channels = self.dataset.in_channels
 
         # Print sample counts per location
         print("\n--- Location Sample Counts ---")

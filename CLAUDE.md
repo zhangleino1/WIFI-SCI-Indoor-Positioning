@@ -9,10 +9,10 @@ This is a WiFi CSI (Channel State Information) based indoor positioning system u
 ## Core Architecture
 
 ### Data Pipeline
-- **Input**: 6-channel CSI data from 3 antennas (amplitude + phase per antenna)
-- **Format**: `(batch_size, 6, time_step, num_subcarriers)` where 6 = 3 antennas × 2 features
-- **Dataset**: CSV files named `antenna_<antenna_id>_<x>_<y>.csv` containing CSI measurements
-- **Processing**: Data is loaded into memory and split into time-windowed segments
+- **Input**: 4-channel CSI data from 2 antennas (amplitude + phase per antenna)
+- **Format**: `(batch_size, 4, time_step, num_subcarriers)` where 4 = 2 antennas × 2 features
+- **Dataset**: MATLAB v7.3 `.mat` files named `CSI_RX_x_p{X}d{DEC}_y_p{Y}d{DEC}_z_p{Z}d{DEC}_{DATE}_{TIME}.mat`
+- **Processing**: Filtered amplitude and calibrated phase are loaded into memory, normalized, and split into time-windowed segments
 
 ### Model Architectures
 1. **CNN_Net** (`cnn_net_model.py`): Pure CNN with 3 conv layers + fully connected layers
@@ -22,7 +22,7 @@ This is a WiFi CSI (Channel State Information) based indoor positioning system u
 ### Key Components
 - **CSIDataset** (`csi_dataset.py`): Custom PyTorch Dataset that loads CSI data and returns regression targets as `(x, y)` tensors
 - **CSIDataModule** (`csi_dataset.py`): PyTorch Lightning DataModule handling train/val/test splits
-- **Utility functions** (`util.py`): Data preprocessing (median filtering, min-max normalization)
+- **Utility functions** (`util.py`): Data preprocessing (min-max normalization)
 
 ## Development Commands
 
@@ -73,7 +73,7 @@ python heatmappic.py --data_dir ./dataset
 - `--min_epochs`: Minimum training epochs (default: 10)
 
 ### Data Configuration
-- `--data_dir`: Path to dataset directory containing CSV files (default: ./dataset)
+- `--data_dir`: Path to dataset directory containing `.mat` files (default: ./dataset)
 - `--num_workers`: DataLoader worker processes (default: 8)
 
 ## Important Implementation Details
@@ -84,7 +84,7 @@ python heatmappic.py --data_dir ./dataset
 - Models output coordinates directly, not class probabilities
 
 ### Data Loading Strategy
-- All CSV data is pre-loaded into memory for faster training
+- All `.mat` CSI arrays are pre-loaded into memory for faster training
 - Data is cached with location keys for efficient access
 - Default `by_location` split keeps locations disjoint across train/validation/test
 - `by_location` is a stricter generalization test, but small datasets may yield higher-variance metrics
@@ -105,17 +105,18 @@ The project requires:
 - Python 3.8+
 - PyTorch with CUDA support (if GPU available)
 - PyTorch Lightning
-- scikit-learn, pandas, numpy
+- scikit-learn, pandas, numpy, h5py
 - matplotlib, seaborn (for visualizations)
 
 Install via conda/pip as specified in USAGE_GUIDE.md.
 
 ## Data Format Requirements
 
-CSV files must follow naming convention: `antenna_<id>_<x>_<y>.csv`
-- Each file contains amplitude and phase columns: `amplitude_0`, `amplitude_1`, ..., `phase_0`, `phase_1`, ...
-- Files for all 3 antennas must exist for each location
-- Missing antenna files for a location will cause that location to be skipped
+`.mat` files must follow naming convention:
+`CSI_RX_x_p{X}d{DEC}_y_p{Y}d{DEC}_z_p{Z}d{DEC}_{DATE}_{TIME}.mat`
+- Each file contains `csiAmplitudeFiltered` and `csiPhaseCalibrated` arrays with shape `(2, 100, 1000)`.
+- The loader uses `coord/x` and `coord/y` as the regression target and validates them against the file name.
+- Each model input sample has shape `(4, time_step, 100)`.
 
 ## Testing and Validation
 

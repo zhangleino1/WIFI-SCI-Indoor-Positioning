@@ -25,15 +25,15 @@ def create_location_grid(data_dir):
                 edgecolors='black', linewidths=1.5, alpha=0.8)
 
     for x, y in dataset.locations:
-        plt.annotate(f"({x},{y})", (x, y),
+        plt.annotate(f"({x:.1f},{y:.1f})", (x, y),
                      ha='center', va='center', fontsize=8,
                      bbox=dict(boxstyle='round,pad=0.3', fc='white', alpha=0.7))
 
     plt.grid(True, linestyle='--', alpha=0.7)
     plt.xlim(min_x - 1, max_x + 1)
     plt.ylim(min_y - 1, max_y + 1)
-    plt.xlabel('X Coordinate (grid units)')
-    plt.ylabel('Y Coordinate (grid units)')
+    plt.xlabel('X Coordinate (m)')
+    plt.ylabel('Y Coordinate (m)')
     plt.title(f'WiFi Indoor Positioning — Measurement Locations\n'
               f'Total: {dataset.num_locations} locations')
     plt.savefig('location_grid.png', dpi=300)
@@ -50,15 +50,15 @@ def create_location_grid(data_dir):
                     edgecolors='black', linewidths=1, alpha=0.8)
 
         for x, y in dataset.locations:
-            plt.annotate(f"({x},{y})", (x, y),
+            plt.annotate(f"({x:.1f},{y:.1f})", (x, y),
                          ha='center', va='center', fontsize=9,
                          bbox=dict(boxstyle='round,pad=0.2', fc='white', alpha=0.7))
 
         plt.grid(True, linestyle='--', alpha=0.5)
         plt.xlim(min_x - 1, max_x + 1)
         plt.ylim(min_y - 1, max_y + 1)
-        plt.xlabel('X Coordinate (grid units)')
-        plt.ylabel('Y Coordinate (grid units)')
+        plt.xlabel('X Coordinate (m)')
+        plt.ylabel('Y Coordinate (m)')
         plt.title('Approximate Location Voronoi Regions')
         plt.savefig('location_voronoi.png', dpi=300)
         plt.show()
@@ -68,7 +68,7 @@ def create_location_grid(data_dir):
     # Print location listing
     print(f"\nFound {dataset.num_locations} unique locations:")
     for loc in dataset.locations:
-        print(f"  ({loc[0]}, {loc[1]})")
+        print(f"  ({loc[0]:.1f}, {loc[1]:.1f})")
 
 
 if __name__ == "__main__":

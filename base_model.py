@@ -24,6 +24,69 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 
+plt.rcParams['font.sans-serif'] = ['SimSun']
+plt.rcParams['axes.unicode_minus'] = False
+
+
+def plot_regression_report(preds, targets, log_dir, model_name):
+    dists = np.sqrt(((preds - targets) ** 2).sum(axis=1))
+
+    mean_d = dists.mean()
+    median_d = np.median(dists)
+    w1 = (dists <= 1.0).mean() * 100
+    w2 = (dists <= 2.0).mean() * 100
+    w3 = (dists <= 3.0).mean() * 100
+
+    print(f'\n{model_name} 回归定位结果:')
+    print(f'  平均距离误差   : {mean_d:.4f} 格')
+    print(f'  中位距离误差   : {median_d:.4f} 格')
+    print(f'  1 格以内 : {w1:.1f}%')
+    print(f'  2 格以内 : {w2:.1f}%')
+    print(f'  3 格以内 : {w3:.1f}%')
+
+    sd = np.sort(dists)
+    cdf = np.arange(1, len(sd) + 1) / len(sd)
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(sd, cdf, linewidth=2)
+    ax.axvline(mean_d, color='r', linestyle='--', label=f'均值 {mean_d:.2f}')
+    ax.axvline(median_d, color='g', linestyle='--', label=f'中位数 {median_d:.2f}')
+    ax.set_xlabel('距离误差（格）')
+    ax.set_ylabel('累积分布函数 CDF')
+    ax.set_title(f'{model_name} — 定位误差累积分布')
+    ax.legend()
+    ax.grid(True, alpha=0.3)
+    fig.tight_layout()
+    fig.savefig(os.path.join(log_dir, f'{model_name}_regression_cdf.png'), dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    dx = preds[:, 0] - targets[:, 0]
+    dy = preds[:, 1] - targets[:, 1]
+    ax.quiver(targets[:, 0], targets[:, 1], dx, dy,
+              angles='xy', scale_units='xy', scale=1,
+              color='gray', alpha=0.3, width=0.003, zorder=2)
+    ax.scatter(targets[:, 0], targets[:, 1], c='steelblue', alpha=0.6, s=18, label='真实位置', zorder=3)
+    ax.scatter(preds[:, 0], preds[:, 1], c='tomato', alpha=0.6, s=18, label='预测位置', zorder=3)
+    ax.set_xlabel('X 坐标（格）')
+    ax.set_ylabel('Y 坐标（格）')
+    ax.set_title(f'{model_name} — 真实位置 vs 预测位置\n'
+                 f'平均误差: {mean_d:.3f}  中位误差: {median_d:.3f}')
+    ax.legend()
+    fig.tight_layout()
+    fig.savefig(os.path.join(log_dir, f'{model_name}_regression_scatter.png'), dpi=150)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.hist(dists, bins=20, alpha=0.8, color='tab:blue', edgecolor='black')
+    ax.set_xlabel('距离误差（格）')
+    ax.set_ylabel('样本数')
+    ax.set_title(f'{model_name} — 定位误差分布直方图')
+    fig.tight_layout()
+    fig.savefig(os.path.join(log_dir, f'{model_name}_regression_hist.png'), dpi=150)
+    plt.close(fig)
+
+    print(f'  图表已保存至 {log_dir}')
+
 
 class CSIBaseModel(pl.LightningModule):
     """Base class — do NOT instantiate directly."""
@@ -131,50 +194,6 @@ class CSIBaseModel(pl.LightningModule):
     # ------------------------------------------------------------------
 
     def _report_regression(self, log_dir: str):
-        preds   = np.array(self.test_reg_preds)    # (N, 2)
-        targets = np.array(self.test_reg_targets)  # (N, 2)
-        dists   = np.sqrt(((preds - targets) ** 2).sum(axis=1))
-
-        mean_d   = dists.mean()
-        median_d = np.median(dists)
-        w1 = (dists <= 1.0).mean() * 100
-        w2 = (dists <= 2.0).mean() * 100
-        w3 = (dists <= 3.0).mean() * 100
-
-        print(f'\n{self.__class__.__name__} Regression Results:')
-        print(f'  Mean Distance Error   : {mean_d:.4f} grid units')
-        print(f'  Median Distance Error : {median_d:.4f} grid units')
-        print(f'  Within 1 unit  : {w1:.1f}%')
-        print(f'  Within 2 units : {w2:.1f}%')
-        print(f'  Within 3 units : {w3:.1f}%')
-
-        # CDF plot
-        sd  = np.sort(dists)
-        cdf = np.arange(1, len(sd) + 1) / len(sd)
-        fig, ax = plt.subplots(figsize=(8, 5))
-        ax.plot(sd, cdf, linewidth=2)
-        ax.axvline(mean_d,   color='r', linestyle='--', label=f'Mean {mean_d:.2f}')
-        ax.axvline(median_d, color='g', linestyle='--', label=f'Median {median_d:.2f}')
-        ax.set_xlabel('Distance Error (grid units)')
-        ax.set_ylabel('CDF')
-        ax.set_title(f'{self.__class__.__name__} — CDF of Position Error')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
-        fig.tight_layout()
-        fig.savefig(os.path.join(log_dir, f'{self.model_name}_regression_cdf.png'), dpi=150)
-        plt.close(fig)
-
-        # Scatter: true vs predicted
-        fig, ax = plt.subplots(figsize=(8, 8))
-        ax.scatter(targets[:, 0], targets[:, 1], c='steelblue', alpha=0.3, s=10, label='True')
-        ax.scatter(preds[:, 0],   preds[:, 1],   c='tomato',    alpha=0.3, s=10, label='Predicted')
-        ax.set_xlabel('X coordinate (grid units)')
-        ax.set_ylabel('Y coordinate (grid units)')
-        ax.set_title(f'{self.__class__.__name__} — True vs Predicted Locations\n'
-                     f'Mean Error: {mean_d:.3f}  Median: {median_d:.3f}')
-        ax.legend()
-        fig.tight_layout()
-        fig.savefig(os.path.join(log_dir, f'{self.model_name}_regression_scatter.png'), dpi=150)
-        plt.close(fig)
-
-        print(f'  Plots saved to {log_dir}')
+        preds = np.array(self.test_reg_preds)
+        targets = np.array(self.test_reg_targets)
+        plot_regression_report(preds, targets, log_dir, self.model_name)

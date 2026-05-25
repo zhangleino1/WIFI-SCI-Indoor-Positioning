@@ -7,29 +7,7 @@ import numpy as np
 import torch
 
 from csi_dataset import CSIDataModule
-from cnn_lstm_net_model import CNN_LSTM_Net
-from cnn_net_model import CNN_Net
-from cnn_transformer_model import CNN_Transformer_Net
-
-
-def load_model(model_path, model_type, data_module, reg_loss):
-    load_kwargs = dict(
-        lr=0.001,
-        lr_factor=0.1,
-        lr_patience=10,
-        lr_eps=1e-6,
-        time_step=data_module.time_step,
-        num_subcarriers=data_module.num_subcarriers,
-        reg_loss=reg_loss,
-    )
-
-    if model_type == 'cnn':
-        return CNN_Net.load_from_checkpoint(model_path, **load_kwargs)
-    if model_type == 'cnn_lstm':
-        return CNN_LSTM_Net.load_from_checkpoint(model_path, **load_kwargs)
-    if model_type == 'cnn_transformer':
-        return CNN_Transformer_Net.load_from_checkpoint(model_path, **load_kwargs)
-    raise ValueError(f'Unsupported model type: {model_type}')
+from visualize_locations import MODEL_CLASSES
 
 
 def analyze_spatial_confusion(args):
@@ -44,7 +22,14 @@ def analyze_spatial_confusion(args):
     )
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = load_model(args.model_path, args.model_type, data_module, args.reg_loss).to(device)
+    cls = MODEL_CLASSES[args.model_type]
+    model = cls.load_from_checkpoint(
+        args.model_path,
+        time_step=data_module.time_step,
+        num_subcarriers=data_module.num_subcarriers,
+        in_channels=data_module.in_channels,
+        reg_loss=args.reg_loss,
+    ).to(device)
     model.eval()
 
     all_preds = []

@@ -11,8 +11,8 @@ class CNN_Transformer_Net(CSIBaseModel):
 
     Architecture
     ------------
-    Input  (batch, 6, time_step, num_subcarriers)
-      → Conv2d(6→16, k=3, p=1) + BN + ReLU + MaxPool(2,2)
+    Input  (batch, in_channels, time_step, num_subcarriers)
+      → Conv2d(in_channels→16, k=3, p=1) + BN + ReLU + MaxPool(2,2)
           → (batch, 16, T/2, S/2)
       → Conv2d(16→32, k=3, p=1) + BN + ReLU + MaxPool(2,2)
           → (batch, 32, T/4, S/4)
@@ -22,10 +22,10 @@ class CNN_Transformer_Net(CSIBaseModel):
 
     Notes
     -----
-    - With default time_step=15, num_subcarriers=30:
+    - With default time_step=15, num_subcarriers=100:
         after two MaxPool(2,2): height = floor(15/2/2) = 3,
-                                width  = floor(30/2/2) = 7
-        d_model = 32 * 7 = 224  (divisible by nhead=4 ✓)
+                                width  = floor(100/2/2) = 25
+        d_model = 32 * 25 = 800  (divisible by nhead=4 ✓)
     - d_model must be divisible by nhead; adjust nhead accordingly.
     """
 
@@ -38,7 +38,8 @@ class CNN_Transformer_Net(CSIBaseModel):
         lr_patience: int,
         lr_eps: float,
         time_step: int = 15,
-        num_subcarriers: int = 30,
+        num_subcarriers: int = 100,
+        in_channels: int = 4,
         reg_loss: str = 'smooth_l1',    # 'smooth_l1' | 'mse' | 'mae'
         nhead: int = 4,
         num_encoder_layers: int = 3,
@@ -48,7 +49,7 @@ class CNN_Transformer_Net(CSIBaseModel):
         self.save_hyperparameters()
 
         # ---- CNN backbone ----
-        self.conv1 = nn.Conv2d(6,  16, kernel_size=3, padding=1)
+        self.conv1 = nn.Conv2d(in_channels, 16, kernel_size=3, padding=1)
         self.bn1   = nn.BatchNorm2d(16)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 

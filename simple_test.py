@@ -17,6 +17,7 @@ if os.path.exists(ckpt_path):
     hparams = checkpoint['hyper_parameters']
     print(f"时间步长: {hparams.get('time_step')}")
     print(f"子载波数: {hparams.get('num_subcarriers')}")
+    print(f"输入通道数: {hparams.get('in_channels')}")
     print(f"回归损失: {hparams.get('reg_loss')}")
 
     model = CNN_Net.load_from_checkpoint(ckpt_path, map_location='cpu')
@@ -24,8 +25,9 @@ if os.path.exists(ckpt_path):
     print('模型加载成功')
 
     time_step = hparams.get('time_step', 15)
-    num_subcarriers = hparams.get('num_subcarriers', 30)
-    test_data = torch.randn(16, 6, time_step, num_subcarriers)
+    num_subcarriers = hparams.get('num_subcarriers', 100)
+    in_channels = hparams.get('in_channels', 4)
+    test_data = torch.randn(16, in_channels, time_step, num_subcarriers)
     print(f'测试数据形状: {test_data.shape}')
 
     with torch.no_grad():

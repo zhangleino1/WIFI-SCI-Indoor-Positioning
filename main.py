@@ -169,7 +169,7 @@ if __name__ == '__main__':
                         help='Epochs without improvement before LR reduction')
     parser.add_argument('--lr_eps',      type=float, default=1e-6)
     parser.add_argument('--max_epochs',  type=int,   default=120)
-    parser.add_argument('--min_epochs',  type=int,   default=30)
+    parser.add_argument('--min_epochs',  type=int,   default=10)
     parser.add_argument('--min_steps',   type=int,   default=5)
     parser.add_argument('--fast_dev_run', action='store_true',
                         help='Run one batch for quick debugging')

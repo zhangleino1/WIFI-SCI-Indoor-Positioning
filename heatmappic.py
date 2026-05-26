@@ -10,8 +10,7 @@ import matplotlib.pyplot as plt
 from util import min_max_normalization
 import matplotlib
 
-# 指定默认字体
-matplotlib.rcParams['font.sans-serif'] = ['SimSun'] 
+matplotlib.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang SC', 'STHeiti', 'SimHei', 'SimSun', 'sans-serif']
 matplotlib.rcParams['font.family'] = 'sans-serif'
 # 解决负号'-'显示为方块的问题
 matplotlib.rcParams['axes.unicode_minus'] = False 

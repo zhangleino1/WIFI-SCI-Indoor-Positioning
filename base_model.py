@@ -24,7 +24,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 import matplotlib.pyplot as plt
 
-plt.rcParams['font.sans-serif'] = ['SimSun']
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang SC', 'STHeiti', 'SimHei', 'SimSun', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
 
 
@@ -107,6 +107,9 @@ class CSIBaseModel(pl.LightningModule):
 
         self.test_reg_preds:   list = []
         self.test_reg_targets: list = []
+
+        if hasattr(self, 'hparams') and 'reg_loss' in self.hparams:
+            self.model_name = f"{self.model_name}_{self.hparams.reg_loss}"
 
     # ------------------------------------------------------------------
     # Loss helper

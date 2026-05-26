@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import torch
 from scipy.spatial import Voronoi, voronoi_plot_2d
 
-plt.rcParams['font.sans-serif'] = ['SimSun']
+plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'PingFang SC', 'STHeiti', 'SimHei', 'SimSun', 'sans-serif']
 plt.rcParams['axes.unicode_minus'] = False
 
 from csi_dataset import CSIDataset, CSIDataModule

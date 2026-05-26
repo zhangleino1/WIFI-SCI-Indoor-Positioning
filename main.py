@@ -65,9 +65,14 @@ def train(args):
     args.num_subcarriers = data_module.num_subcarriers
     args.in_channels = data_module.in_channels
     model   = get_model(args)
-    logger  = TensorBoardLogger('./logs', name=args.model_type)
+    logger  = TensorBoardLogger('./logs', name=f"{args.model_type}_{args.reg_loss}")
 
-    accelerator = 'gpu' if torch.cuda.is_available() else 'cpu'
+    if torch.cuda.is_available():
+        accelerator = 'gpu'
+    elif torch.backends.mps.is_available():
+        accelerator = 'mps'
+    else:
+        accelerator = 'cpu'
     print(f"Using accelerator: {accelerator}")
 
     trainer = pl.Trainer(
@@ -99,7 +104,7 @@ def test(args):
     )
     args.num_subcarriers = data_module.num_subcarriers
     args.in_channels = data_module.in_channels
-    logger = TensorBoardLogger('./logs', name=f'{args.model_type}_test')
+    logger = TensorBoardLogger('./logs', name=f'{args.model_type}_{args.reg_loss}_test')
 
     load_kwargs = dict(
         lr=args.lr,
@@ -121,7 +126,12 @@ def test(args):
     else:
         raise ValueError(f"Unknown model_type: {args.model_type}")
 
-    accelerator = 'gpu' if torch.cuda.is_available() else 'cpu'
+    if torch.cuda.is_available():
+        accelerator = 'gpu'
+    elif torch.backends.mps.is_available():
+        accelerator = 'mps'
+    else:
+        accelerator = 'cpu'
     trainer = pl.Trainer(
         accelerator=accelerator,
         devices=1,

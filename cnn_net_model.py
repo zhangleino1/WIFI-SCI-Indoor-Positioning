@@ -37,12 +37,19 @@ class CNN_Net(CSIBaseModel):
 
         self.conv1 = nn.Conv2d(in_channels, 18, kernel_size=5, padding=2)
         self.bn1   = nn.BatchNorm2d(18)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
         self.conv2 = nn.Conv2d(18, 18, kernel_size=5, padding=2)
         self.bn2   = nn.BatchNorm2d(18)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
         self.conv3 = nn.Conv2d(18, 18, kernel_size=5, padding=2)
         self.bn3   = nn.BatchNorm2d(18)
 
-        feat = 18 * time_step * num_subcarriers   # dims preserved by padding
+        # Size after two MaxPool2d(2, 2)
+        self._h = time_step // 4
+        self._w = num_subcarriers // 4
+        feat = 18 * self._h * self._w
 
         self.fc1      = nn.Linear(feat, 1024)
         self.bn4      = nn.BatchNorm1d(1024)
@@ -54,8 +61,8 @@ class CNN_Net(CSIBaseModel):
         self._init_regression_head(feature_dim=512)
 
     def _extract_features(self, x: torch.Tensor) -> torch.Tensor:
-        x = F.relu(self.bn1(self.conv1(x)))
-        x = F.relu(self.bn2(self.conv2(x)))
+        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
         x = F.relu(self.bn3(self.conv3(x)))
         x = x.view(x.size(0), -1)
         x = self.dropout1(F.relu(self.bn4(self.fc1(x))))
